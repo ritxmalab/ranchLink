@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #FFFFFF;  /* Light background */
+  --bg-secondary: #F7F7F7;
+  --bg-card: #FFFFFF;
+  --c1: #1A1A1A;  /* Dark text */
+  --c2: #FF6B35;  /* Vibrant orange primary */
+  --c3: #FFA500;  /* Golden orange accent */
+  --c4: #606060;  /* Muted gray text */
+  
+  --font-inter: 'Inter', system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg)] text-[var(--c1)] font-sans;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply text-[var(--c1)] font-bold;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[var(--c2)] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#E55A2B] transition-all shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-secondary {
+    @apply bg-[var(--bg-card)] text-[var(--c1)] border-2 border-[#E5E7EB] px-6 py-3 rounded-lg font-semibold hover:border-[var(--c2)] hover:text-[var(--c2)] transition-all;
+  }
+  
+  .card {
+    @apply bg-[var(--bg-card)] rounded-xl shadow-xl p-6 border border-[#E5E7EB];
+  }
+  
+  .card-hover {
+    @apply card hover:border-[var(--c2)] hover:shadow-2xl transition-all cursor-pointer;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-[var(--c1)] via-[var(--c2)] to-[var(--c3)] bg-clip-text text-transparent;
+  }
+}
+
