@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseServer } from '@/lib/supabase/server'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
 
 /**
  * Test endpoint to verify Supabase connection
@@ -7,8 +7,9 @@ import { supabaseServer } from '@/lib/supabase/server'
  */
 export async function GET() {
   try {
+    const supabase = getSupabaseServerClient()
     // Test connection by querying a simple table
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabase
       .from('owners')
       .select('count')
       .limit(1)

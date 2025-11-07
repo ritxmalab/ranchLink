@@ -1,25 +1,41 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+type AnySupabaseClient = SupabaseClient<any, string, any>
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+function getSupabasePublicConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !anonKey) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables')
+  }
+
+  return { url, anonKey }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+let cachedPublicClient: AnySupabaseClient | null = null
 
-// Server-side client (with service key)
-export function createServerClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY!
-  if (!serviceKey) {
-    throw new Error('Missing SUPABASE_SERVICE_KEY')
+export function getSupabaseClient(): AnySupabaseClient {
+  if (!cachedPublicClient) {
+    const { url, anonKey } = getSupabasePublicConfig()
+    cachedPublicClient = createClient(url, anonKey)
   }
-  return createClient(supabaseUrl, serviceKey, {
+  return cachedPublicClient
+}
+
+export function createServerClient(): AnySupabaseClient {
+  const { url } = getSupabasePublicConfig()
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY
+
+  if (!serviceKey) {
+    throw new Error('Missing SUPABASE_SERVICE_KEY environment variable')
+  }
+
+  return createClient(url, serviceKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
-    }
+      persistSession: false,
+    },
   })
 }
 

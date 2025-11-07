@@ -1,26 +1,35 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-/**
- * Server-side Supabase client
- * Uses service_role key for admin operations
- * ⚠️ NEVER expose this in frontend code!
- */
+type AnySupabaseClient = SupabaseClient<any, string, any>
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
+function getServerConfig() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY
 
-if (!supabaseUrl) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL')
-}
-
-if (!supabaseServiceKey) {
-  console.warn('⚠️ SUPABASE_SERVICE_KEY not set. Server-side operations may fail.')
-}
-
-export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+  if (!url) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable')
   }
-})
+
+  if (!serviceKey) {
+    throw new Error('Missing SUPABASE_SERVICE_KEY environment variable')
+  }
+
+  return { url, serviceKey }
+}
+
+let cachedServerClient: AnySupabaseClient | null = null
+
+export function getSupabaseServerClient(): AnySupabaseClient {
+  if (!cachedServerClient) {
+    const { url, serviceKey } = getServerConfig()
+    cachedServerClient = createClient(url, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+
+  return cachedServerClient
+}
 
