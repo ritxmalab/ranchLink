@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f7f7f7;
+  --bg-card: #ffffff;
+  --c1: #1a1a1a;
+  --c2: #ff6b35;
+  --c3: #ffa500;
+  --c4: #606060;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--bg)] text-[var(--c1)] font-sans;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-[var(--c1)] font-bold;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[var(--c2)] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#e55a2b] transition-all shadow-lg hover:shadow-xl;
+  }
+
+  .btn-secondary {
+    @apply bg-[var(--bg-card)] text-[var(--c1)] border-2 border-[#e5e7eb] px-6 py-3 rounded-lg font-semibold hover:border-[var(--c2)] hover:text-[var(--c2)] transition-all;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-[var(--c1)] mb-2;
+  }
+
+  .form-input {
+    @apply w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white;
+  }
+
+  .form-textarea {
+    @apply w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white resize-none;
+  }
+
+  .card {
+    @apply bg-[var(--bg-card)] rounded-xl shadow-xl p-6 border border-[#e5e7eb];
+  }
+
+  .card-hover {
+    @apply card hover:border-[var(--c2)] hover:shadow-2xl transition-all cursor-pointer;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-[var(--c1)] via-[var(--c2)] to-[var(--c3)] bg-clip-text text-transparent;
+  }
+
+  .form-checkbox {
+    @apply w-4 h-4 rounded border-gray-300 text-[var(--c2)] focus:ring-[var(--c2)];
+  }
+}
+
+
