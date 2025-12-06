@@ -3,6 +3,24 @@
   "globalDependencies": ["**/.env.*local"],
   "tasks": {
     "build": {
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_KEY",
+        "NEXT_PUBLIC_APP_URL",
+        "PINATA_JWT",
+        "NEXT_PUBLIC_ALCHEMY_BASE_RPC",
+        "NEXT_PUBLIC_ALCHEMY_BASE_SEPOLIA_RPC",
+        "NEXT_PUBLIC_CHAIN_ID",
+        "NEXT_PUBLIC_CONTRACT_TAG",
+        "NEXT_PUBLIC_CONTRACT_REGISTRY",
+        "CDP_APP_ID",
+        "CDP_CLIENT_AUTH",
+        "CDP_API_KEY_ID",
+        "CDP_API_KEY_SECRET",
+        "SERVER_WALLET_ADDRESS",
+        "SERVER_SOLANA_ADDRESS"
+      ],
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**", "build/**"]
     },

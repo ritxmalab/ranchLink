@@ -132,3 +132,4 @@ After viewing QR generator:
 
 Everything is ready! Navigate to `/superadmin/qr-generator` to see it! 🚀
 
+

@@ -167,3 +167,4 @@ cat .env.local | grep SUPABASE
 
 Ready to run migrations? Let me know when you have the service role key! 🚀
 
+

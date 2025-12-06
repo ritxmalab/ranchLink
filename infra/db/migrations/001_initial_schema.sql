@@ -148,3 +148,4 @@ create index if not exists idx_devices_batch on devices(batch_id);
 create index if not exists idx_devices_owner on devices(owner_id);
 create index if not exists idx_devices_claim_token on devices(claim_token);
 
+

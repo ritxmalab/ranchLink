@@ -110,3 +110,4 @@ npm run dev
 cat apps/web/.env.local | grep -E "(SUPABASE|PINATA|TREASURY)"
 ```
 
+

@@ -65,3 +65,4 @@ export default function QRCodeDisplay({ url, size = 200, className = '' }: QRCod
   )
 }
 
+

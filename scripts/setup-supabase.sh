@@ -67,3 +67,4 @@ echo ""
 echo "✅ Setup checklist saved to SUPABASE_SETUP.md"
 echo ""
 
+

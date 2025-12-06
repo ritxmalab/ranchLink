@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/client'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
 
 // GET /api/animals/[id] - Get animal by public_id
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const publicId = params.id
-    const supabase = createServerClient()
+    const supabase = getSupabaseServerClient()
 
     // Get animal with owner info
     const { data: animal, error } = await supabase
@@ -53,4 +53,5 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
 

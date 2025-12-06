@@ -47,3 +47,4 @@ Since Base uses the same address:
 3. **NFT Minting:** Base L2 (recommended for cost efficiency)
 4. **Cross-chain:** Use bridges when needed
 
+

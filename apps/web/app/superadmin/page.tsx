@@ -168,6 +168,11 @@ export default function SuperAdminPage() {
         body: JSON.stringify({ devices: generated }),
       })
 
+      // Handle network errors
+      if (!response) {
+        throw new Error('Network error: Could not connect to server. Check if environment variables are set in Vercel.')
+      }
+
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Failed to save devices')
@@ -176,8 +181,15 @@ export default function SuperAdminPage() {
       await fetchDevices()
       setMessage(`Saved ${generated.length} tags to Supabase`)
     } catch (error: any) {
-      console.error(error)
-      setErrorMessage(error.message)
+      console.error('Generate error:', error)
+      // Provide more helpful error messages
+      if (error.message?.includes('fetch failed') || error.message?.includes('Network')) {
+        setErrorMessage('Network error: Could not connect to server. This usually means environment variables are missing in Vercel. Please check: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_KEY are set.')
+      } else if (error.message?.includes('Missing')) {
+        setErrorMessage(`Configuration error: ${error.message}. Please add the missing environment variables in Vercel.`)
+      } else {
+        setErrorMessage(error.message || 'Failed to generate and save QR codes')
+      }
     } finally {
       setIsSaving(false)
     }

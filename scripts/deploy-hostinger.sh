@@ -52,3 +52,4 @@ echo ""
 echo "App should be running at: https://ritxma.com/ranchlink"
 echo ""
 
+

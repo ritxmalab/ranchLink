@@ -43,3 +43,4 @@ echo ""
 cd apps/web
 pnpm dev
 
+

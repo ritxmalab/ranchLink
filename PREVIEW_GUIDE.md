@@ -146,5 +146,7 @@ Once you've seen the UI:
 - **Professional** look
 - **Mobile-friendly** responsive design
 
-Everything is ready for you to preview! Run `pnpm dev` and start exploring! 🚀
+Everything is ready for you to preview! Run `
+pnpm dev` and start exploring! 🚀
+
 

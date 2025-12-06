@@ -54,3 +54,4 @@ echo "2. Run database migrations: pnpm db:migrate"
 echo "3. Start dev server: pnpm dev"
 echo ""
 
+

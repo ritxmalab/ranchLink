@@ -163,3 +163,4 @@ NEXT_PUBLIC_BASE_PATH=/ranchlink
 
 Everything is centralized here - no external tools needed for development.
 
+

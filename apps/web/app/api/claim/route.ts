@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/client'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { pinAnimalMetadata } from '@/lib/ipfs/client'
 import { CONTRACTS, currentChain } from '@/lib/blockchain/config'
 import { createWalletClient, http, parseEther } from 'viem'
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 })
     }
 
-    const supabase = createServerClient()
+    const supabase = getSupabaseServerClient()
 
     // Find device by claim token
     const { data: device, error: deviceError } = await supabase
@@ -127,4 +127,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }
+
 

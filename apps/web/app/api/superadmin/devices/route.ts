@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/client'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
 
 // Helper to map metadata fields into flat structure
 function mapDevice(record: any) {
@@ -19,27 +19,62 @@ function mapDevice(record: any) {
 }
 
 export async function GET(request: Request) {
-  const supabase = createServerClient()
-  const url = new URL(request.url)
-  const limitParam = url.searchParams.get('limit')
-  const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 200, 500) : 200
+  try {
+    // Check environment variables first
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ 
+        error: 'Missing NEXT_PUBLIC_SUPABASE_URL environment variable' 
+      }, { status: 500 })
+    }
+    if (!process.env.SUPABASE_SERVICE_KEY) {
+      return NextResponse.json({ 
+        error: 'Missing SUPABASE_SERVICE_KEY environment variable' 
+      }, { status: 500 })
+    }
 
-  const { data, error } = await supabase
-    .from('devices')
-    .select('id, tag_id, claim_token, public_id, overlay_qr_url, base_qr_url, status, serial, type, metadata, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit)
+    const supabase = getSupabaseServerClient()
+    const url = new URL(request.url)
+    const limitParam = url.searchParams.get('limit')
+    const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 200, 500) : 200
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    // Query devices - don't select created_at if it doesn't exist
+    let query = supabase
+      .from('devices')
+      .select('id, tag_id, claim_token, public_id, overlay_qr_url, base_qr_url, status, serial, type, metadata')
+      .limit(limit)
+    
+    // Try to order by created_at, but it might not exist
+    // Order by id as fallback
+    const { data, error } = await query.order('id', { ascending: false })
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ devices: (data || []).map(mapDevice) })
+  } catch (err: any) {
+    return NextResponse.json({ 
+      error: err.message || 'Failed to fetch devices',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    }, { status: 500 })
   }
-
-  return NextResponse.json({ devices: (data || []).map(mapDevice) })
 }
 
 export async function POST(request: Request) {
   try {
-    const supabase = createServerClient()
+    // Check environment variables first
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ 
+        error: 'Missing NEXT_PUBLIC_SUPABASE_URL environment variable' 
+      }, { status: 500 })
+    }
+    if (!process.env.SUPABASE_SERVICE_KEY) {
+      return NextResponse.json({ 
+        error: 'Missing SUPABASE_SERVICE_KEY environment variable' 
+      }, { status: 500 })
+    }
+
+    const supabase = getSupabaseServerClient()
     const body = await request.json()
     const devices = Array.isArray(body?.devices) ? body.devices : []
 
@@ -72,7 +107,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from('devices')
       .upsert(payload, { onConflict: 'tag_id' })
-      .select('id, tag_id, claim_token, public_id, overlay_qr_url, base_qr_url, status, serial, type, metadata, created_at')
+      .select('id, tag_id, claim_token, public_id, overlay_qr_url, base_qr_url, status, serial, type, metadata')
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
