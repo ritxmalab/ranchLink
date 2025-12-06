@@ -166,12 +166,20 @@ export async function POST(request: NextRequest) {
         mintTxHash = mintResult.txHash
 
         // Update device with token ID and transaction hash
+        // Reconstruct metadata since we only selected 'id' in the insert query
         await supabase
           .from('devices')
           .update({
             token_id: tokenId.toString(),
             metadata: {
-              ...tag.metadata,
+              material,
+              model,
+              chain,
+              color,
+              batch_name: batchName,
+              batch_date: new Date().toISOString().slice(0, 10),
+              code,
+              tag_code: tagCode,
               mint_tx_hash: mintTxHash,
               token_id: tokenId.toString(),
             },
