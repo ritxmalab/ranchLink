@@ -21,6 +21,18 @@ const nextConfig = {
   experimental: {
     serverActions: true,
   },
+  // Ignore optional dependencies that cause build warnings
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Ignore optional ws dependencies that aren't needed for server-side builds
+      config.externals = config.externals || []
+      config.externals.push({
+        'bufferutil': 'commonjs bufferutil',
+        'utf-8-validate': 'commonjs utf-8-validate',
+      })
+    }
+    return config
+  },
   // Ensure API routes work with basePath
   async rewrites() {
     return [
