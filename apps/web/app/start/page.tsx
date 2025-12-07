@@ -29,13 +29,14 @@ export default function StartPage() {
     setLoading(true)
     setError(null)
 
-    // If token looks like a tag_code, redirect to v1.0 flow
+    // v1.0: If token looks like a tag_code (RL-XXX), redirect to v1.0 flow
     if (isTagCode(formData.token)) {
       router.push(`/t/${formData.token.trim().toUpperCase()}`)
       return
     }
 
-    // Otherwise, try legacy claim flow
+    // LEGACY: Only for old claim_token format (deprecated)
+    // v1.0 uses /t/[tag_code] flow instead
     try {
       const response = await fetch('/api/claim', {
         method: 'POST',

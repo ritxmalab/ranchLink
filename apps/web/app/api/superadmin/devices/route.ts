@@ -92,10 +92,10 @@ export async function GET(request: Request) {
         contract_address: tag.contract_address,
         status: tag.status || 'in_inventory',
         activation_state: tag.activation_state || 'active',
-        // Generate base_qr_url from tag_code
+        // Generate base_qr_url from tag_code (v1.0: ONLY base QR, NO overlay)
         base_qr_url: tag.tag_code ? `${appUrl}/t/${tag.tag_code}` : '',
-        overlay_qr_url: '', // v1.0 doesn't use overlay
-        claim_token: '', // v1.0 doesn't use claim_token
+        overlay_qr_url: '', // v1.0: DEPRECATED - always empty, never used
+        claim_token: '', // v1.0: DEPRECATED - always empty, never used
         serial: tag.tag_code,
         type: null,
         material: batch?.material || null,

@@ -17,7 +17,17 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseServerClient()
 
-    // Find device by claim token
+    // LEGACY ENDPOINT - v1.0 uses /t/[tag_code] flow instead
+    // This endpoint is kept for backward compatibility only
+    // If token looks like a tag_code (RL-XXX), redirect to v1.0 flow
+    if (/^RL-\d+$/i.test(token.trim())) {
+      return NextResponse.json({ 
+        error: 'This endpoint is deprecated. Please use /t/[tag_code] instead.',
+        redirect: `/t/${token.trim().toUpperCase()}`
+      }, { status: 400 })
+    }
+
+    // Find device by claim token (LEGACY - only for old tokens)
     const { data: device, error: deviceError } = await supabase
       .from('devices')
       .select('*')

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
+import { getBuildBadgeText } from '@/lib/build-info'
 
 interface Animal {
   id: string
@@ -178,8 +179,17 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">My Ranch Dashboard</h1>
-          <p className="text-[var(--c4)]">Manage your animals, tags, and blockchain assets</p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">My Ranch Dashboard</h1>
+              <p className="text-[var(--c4)]">Manage your animals, tags, and blockchain assets</p>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-500 font-mono">
+                {getBuildBadgeText()}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* High-Level Stats */}

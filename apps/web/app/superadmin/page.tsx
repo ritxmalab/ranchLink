@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
+import { getBuildBadgeText } from '@/lib/build-info'
 
 interface Batch {
   id: string
@@ -51,7 +52,7 @@ const mapDevice = (device: any): Device => {
     public_id: device.public_id || null,
     token_id: device.token_id || null,
     mint_tx_hash: device.mint_tx_hash || null,
-    overlay_qr_url: '', // v1.0 doesn't use overlay - always empty
+    overlay_qr_url: '', // v1.0: DEPRECATED - always empty, never displayed
     base_qr_url: device.base_qr_url || metadata.base_qr_url || (device.tag_code ? `${appUrl}/t/${device.tag_code}` : ''),
     status: device.status || 'in_inventory',
     activation_state: device.activation_state || 'active',
@@ -157,8 +158,8 @@ export default function SuperAdminPage() {
         token_id: tag.token_id,
         mint_tx_hash: tag.mint_tx_hash,
         base_qr_url: tag.base_qr_url,
-        overlay_qr_url: '', // v1.0: NO OVERLAY - deprecated
-        claim_token: '', // v1.0: NO CLAIM TOKEN - deprecated
+        overlay_qr_url: '', // v1.0: DEPRECATED - always empty
+        claim_token: '', // v1.0: DEPRECATED - always empty
         status: tag.status || 'in_inventory',
         activation_state: tag.activation_state || 'active',
         chain: tag.chain || 'BASE',
@@ -239,8 +240,17 @@ export default function SuperAdminPage() {
     <div className="min-h-screen bg-[var(--bg)] py-8 px-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">RanchLink Factory</h1>
-          <p className="text-[var(--c4)]">Generate blockchain-linked tags for production</p>
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">RanchLink Factory</h1>
+              <p className="text-[var(--c4)]">Generate blockchain-linked tags for production</p>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-gray-500 font-mono">
+                {getBuildBadgeText()}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
