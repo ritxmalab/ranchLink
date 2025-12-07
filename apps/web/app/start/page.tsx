@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function StartPage() {
@@ -24,12 +24,19 @@ export default function StartPage() {
     return /^RL-\d+$/i.test(token.trim())
   }
 
+  // Auto-redirect if token is a tag_code (v1.0 flow)
+  useEffect(() => {
+    if (formData.token && isTagCode(formData.token)) {
+      router.push(`/t/${formData.token.trim().toUpperCase()}`)
+    }
+  }, [formData.token, router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    // v1.0: If token looks like a tag_code (RL-XXX), redirect to v1.0 flow
+    // v1.0: If token looks like a tag_code (RL-XXX), redirect to v1.0 flow IMMEDIATELY
     if (isTagCode(formData.token)) {
       router.push(`/t/${formData.token.trim().toUpperCase()}`)
       return

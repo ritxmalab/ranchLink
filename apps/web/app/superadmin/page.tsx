@@ -690,9 +690,60 @@ export default function SuperAdminPage() {
                               </span>
                             )}
                             {onChainStatus === 'off-chain' && (
-                              <span className="px-2 py-1 bg-yellow-900/20 text-yellow-400 rounded text-xs font-semibold">
-                                ⚪ OFF-CHAIN
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 bg-yellow-900/20 text-yellow-400 rounded text-xs font-semibold">
+                                  ⚪ OFF-CHAIN
+                                </span>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Retry mint for ${device.tag_code}?\n\nThis will attempt to mint the NFT on Base Mainnet.`)) return
+                                    
+                                    // Show loading state
+                                    const button = event.currentTarget
+                                    const originalText = button.textContent
+                                    button.disabled = true
+                                    button.textContent = '⏳ Minting...'
+                                    
+                                    try {
+                                      const response = await fetch('/api/retry-mint', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ tagCode: device.tag_code }),
+                                      })
+                                      const data = await response.json()
+                                      
+                                      if (data.success) {
+                                        // Show success with details
+                                        const message = `✅ Mint Successful!\n\nToken ID: #${data.token_id}\nTransaction: ${data.mint_tx_hash}\n\nView on Basescan: ${data.basescan_url}`
+                                        alert(message)
+                                        fetchDevices()
+                                      } else {
+                                        // Show detailed error
+                                        let errorMsg = `❌ Mint Failed\n\nError: ${data.message || data.error}\n`
+                                        if (data.error_code) {
+                                          errorMsg += `Code: ${data.error_code}\n\n`
+                                        }
+                                        if (data.checks && Array.isArray(data.checks)) {
+                                          errorMsg += 'Checks:\n' + data.checks.join('\n') + '\n\n'
+                                        }
+                                        if (data.errors && Array.isArray(data.errors)) {
+                                          errorMsg += 'Errors:\n' + data.errors.join('\n')
+                                        }
+                                        alert(errorMsg)
+                                      }
+                                    } catch (err: any) {
+                                      alert(`❌ Network Error: ${err.message}\n\nPlease check your connection and try again.`)
+                                    } finally {
+                                      button.disabled = false
+                                      button.textContent = originalText
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-[var(--c2)] text-white rounded text-xs hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Retry mint for this tag"
+                                >
+                                  🔄 Retry Mint
+                                </button>
+                              </div>
                             )}
                             {onChainStatus === 'error' && (
                               <span className="px-2 py-1 bg-red-900/20 text-red-400 rounded text-xs font-semibold">
