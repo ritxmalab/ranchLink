@@ -69,7 +69,7 @@ const mapDevice = (device: any): Device => {
 }
 
 export default function SuperAdminPage() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'batches' | 'inventory' | 'qr-generator'>('qr-generator')
+  const [activeTab, setActiveTab] = useState<'factory' | 'dashboard' | 'inventory'>('factory')
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [batches, setBatches] = useState<Batch[]>([])
@@ -231,7 +231,7 @@ export default function SuperAdminPage() {
   }
 
   const tabs = [
-    { id: 'qr-generator', label: '🏭 Factory' },
+    { id: 'factory', label: '🏭 Factory' },
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'inventory', label: '📦 Inventory' },
   ]
@@ -246,8 +246,10 @@ export default function SuperAdminPage() {
               <p className="text-[var(--c4)]">Generate blockchain-linked tags for production</p>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 font-mono">
-                {getBuildBadgeText()}
+              <div className="bg-[var(--bg-card)] border-2 border-[var(--c2)]/50 px-4 py-2 rounded-lg shadow-lg">
+                <div className="text-sm font-bold text-[var(--c2)] font-mono">
+                  {getBuildBadgeText()}
+                </div>
               </div>
             </div>
           </div>
@@ -270,13 +272,13 @@ export default function SuperAdminPage() {
           ))}
         </div>
 
-        {/* QR Generator Tab */}
-        {activeTab === 'qr-generator' && (
+        {/* Factory Tab - v1.0 */}
+        {activeTab === 'factory' && (
           <div className="space-y-6">
             <div className="card">
-              <h2 className="text-2xl font-bold mb-4">🏭 QR Code Generator - Real World Asset Machine</h2>
+              <h2 className="text-2xl font-bold mb-4">🏭 Factory - Generate & Mint Tags</h2>
               <p className="text-[var(--c4)] mb-6">
-                Generate compliant QR codes for blockchain-linked real-world assets. Tags are pre-minted on Base Mainnet.
+                Generate blockchain-linked tags for production. Tags are pre-minted on Base Mainnet and ready for printing.
               </p>
 
               {/* Batch Creation Form */}
@@ -594,9 +596,9 @@ export default function SuperAdminPage() {
               {devices.length === 0 && !isSaving && (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">🏭</div>
-                  <h3 className="text-xl font-bold mb-2">Real World Asset QR Generator</h3>
+                  <h3 className="text-xl font-bold mb-2">Factory - Ready to Generate Tags</h3>
                   <p className="text-[var(--c4)] mb-6">
-                    Configure your batch settings above and click "Generate & Mint Tags" to create blockchain-linked tags
+                    Configure your batch settings above and click "Generate & Mint Tags" to create blockchain-linked tags on Base Mainnet.
                   </p>
                 </div>
               )}

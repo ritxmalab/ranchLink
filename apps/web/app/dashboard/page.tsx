@@ -141,7 +141,7 @@ export default function DashboardPage() {
     }
   }
 
-  const getOnChainStatus = (tag: Tag): 'on-chain' | 'off-chain' | 'error' => {
+  const getOnChainStatus = (tag: Tag | { token_id: string | null; contract_address: string | null }): 'on-chain' | 'off-chain' | 'error' => {
     if (tag.token_id && tag.contract_address) {
       return 'on-chain'
     } else if (!tag.token_id) {
@@ -185,8 +185,10 @@ export default function DashboardPage() {
               <p className="text-[var(--c4)]">Manage your animals, tags, and blockchain assets</p>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 font-mono">
-                {getBuildBadgeText()}
+              <div className="bg-[var(--bg-card)] border-2 border-[var(--c2)]/50 px-4 py-2 rounded-lg shadow-lg">
+                <div className="text-sm font-bold text-[var(--c2)] font-mono">
+                  {getBuildBadgeText()}
+                </div>
               </div>
             </div>
           </div>
