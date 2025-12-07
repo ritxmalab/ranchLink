@@ -34,6 +34,13 @@ const RANCHLINK_TAG_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [{ name: 'publicIdHash', type: 'bytes32' }],
+    name: 'getTokenId',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const
 
 /**
@@ -86,6 +93,15 @@ export function hashPublicId(publicId: string): `0x${string}` {
  * @param recipientAddress - Address to mint to (defaults to server wallet)
  * @returns Token ID and transaction hash
  */
+/**
+ * Mint a new tag NFT
+ * 
+ * TODO: LastBurner / Non-custodial Support
+ * - Currently mints to server wallet (custodial model)
+ * - Future: Allow minting directly to rancher's EOA or Burner card address
+ * - When LastBurner kits are shipped, recipientAddress will be the Burner address
+ * - Liquidity flows (USDC, sales) can be wired to that same address
+ */
 export async function mintTag(
   tagCode: string,
   publicId: string,
@@ -95,6 +111,8 @@ export async function mintTag(
   try {
     const contractAddress = getContractAddress()
     const walletClient = getWalletClient()
+    // TODO: For LastBurner kits, recipientAddress will be the Burner card address
+    // For now, default to server wallet (custodial)
     const recipient = recipientAddress || walletClient.account.address
 
     // Hash the public ID
@@ -111,27 +129,18 @@ export async function mintTag(
     // Wait for transaction receipt
     const receipt = await publicClient.waitForTransactionReceipt({ hash })
 
-    // Extract token ID from events or receipt
-    // Note: The contract returns tokenId, but we need to parse it from events
-    // For now, we'll need to call a view function or parse events
-    // This is a simplified version - you may need to adjust based on contract events
+    // Get token ID using the contract's getTokenId function
+    // This is more reliable than parsing events
+    const tokenId = await publicClient.readContract({
+      address: contractAddress,
+      abi: RANCHLINK_TAG_ABI,
+      functionName: 'getTokenId',
+      args: [publicIdHash],
+    }) as bigint
 
-    // Parse token ID from transaction receipt events
-    // The contract emits TagMinted event with tokenId
-    // For now, we'll need to query the contract or parse events
-    // This is a simplified version - adjust based on your contract's event structure
-    let tokenId: bigint = BigInt(0)
-    
-    // Try to get token ID from events
-    if (receipt.logs && receipt.logs.length > 0) {
-      // Parse TagMinted event - adjust based on actual event structure
-      // For now, we'll query the contract's nextTokenId or use a workaround
-      // You may need to adjust this based on your contract implementation
+    if (!tokenId || tokenId === BigInt(0)) {
+      throw new Error('Failed to get token ID after minting')
     }
-    
-    // If we can't get it from events, we'll need to query the contract
-    // For v1.0, we can store the txHash and query tokenId later if needed
-    // Or implement a view function in the contract to get the latest minted token
 
     return {
       tokenId,

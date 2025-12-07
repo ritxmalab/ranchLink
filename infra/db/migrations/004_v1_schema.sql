@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS tags (
   animal_id uuid,                             -- Will reference animals.id after migration
   batch_id uuid REFERENCES batches(id),
   status text DEFAULT 'in_inventory',         -- 'in_inventory' | 'assigned' | 'attached' | 'retired'
+  activation_state text DEFAULT 'active',      -- 'active' | 'inactive' (RanchLink-level switch)
   created_at timestamptz DEFAULT now()
 );
 
@@ -39,6 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_tags_animal ON tags(animal_id);
 CREATE INDEX IF NOT EXISTS idx_tags_batch ON tags(batch_id);
 CREATE INDEX IF NOT EXISTS idx_tags_token_id ON tags(token_id);
 CREATE INDEX IF NOT EXISTS idx_tags_status ON tags(status);
+CREATE INDEX IF NOT EXISTS idx_tags_activation_state ON tags(activation_state);
 
 -- ============================================
 -- KITS (for retail distribution)
@@ -81,6 +83,24 @@ ALTER TABLE batches ADD COLUMN IF NOT EXISTS chain text DEFAULT 'BASE';
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS material text;
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS color text;
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS target_ranch_id uuid REFERENCES ranches(id);
+
+-- ============================================
+-- CONTRACTS (for future multi-chain/RWA support)
+-- ============================================
+CREATE TABLE IF NOT EXISTS contracts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,                          -- e.g. "RanchLinkTag Base Mainnet"
+  symbol text,                                 -- e.g. "RLTAG"
+  contract_address text NOT NULL,
+  chain text NOT NULL,                         -- e.g. "BASE_MAINNET", "BASE_SEPOLIA", "POLYGON"
+  standard text,                               -- e.g. "ERC721", "ERC1155", "RWA_7518"
+  default_for text,                            -- e.g. "cattle", "land", "equipment"
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contracts_address ON contracts(contract_address);
+CREATE INDEX IF NOT EXISTS idx_contracts_chain ON contracts(chain);
+CREATE INDEX IF NOT EXISTS idx_contracts_default_for ON contracts(default_for);
 
 -- ============================================
 -- MIGRATION HELPERS
@@ -128,6 +148,7 @@ BEGIN
       WHEN status = 'printed' THEN 'in_inventory'
       ELSE 'in_inventory'
     END,
+    'active', -- activation_state default
     created_at
   FROM devices
   ON CONFLICT (tag_code) DO NOTHING;

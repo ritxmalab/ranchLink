@@ -1,22 +1,21 @@
-import Link from 'next/link'
-
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[var(--bg)] to-[var(--bg-secondary)] flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
       <div className="text-center">
         <h1 className="text-6xl font-bold mb-4">404</h1>
-        <p className="text-xl text-[var(--c4)] mb-8">This page could not be found.</p>
+        <h2 className="text-2xl font-bold mb-4">This page could not be found.</h2>
+        <p className="text-[var(--c4)] mb-8">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
         <div className="flex gap-4 justify-center">
-          <Link href="/" className="btn-primary">
+          <a href="/" className="btn-primary">
             Go Home
-          </Link>
-          <Link href="/superadmin" className="btn-secondary">
+          </a>
+          <a href="/superadmin" className="btn-secondary">
             Super Admin
-          </Link>
+          </a>
         </div>
       </div>
     </div>
   )
 }
-
-

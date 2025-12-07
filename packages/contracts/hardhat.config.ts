@@ -1,8 +1,12 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@openzeppelin/hardhat-upgrades";
 import * as dotenv from "dotenv";
+import * as path from "path";
 
+// Load .env from current directory, then from apps/web/.env.local
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../apps/web/.env.local') });
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -16,7 +20,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     base: {
-      url: process.env.ALCHEMY_BASE_RPC || "https://mainnet.base.org",
+      url: process.env.ALCHEMY_BASE_RPC || process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC || "https://mainnet.base.org",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
     baseSepolia: {

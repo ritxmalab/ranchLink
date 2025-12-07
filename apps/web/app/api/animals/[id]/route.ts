@@ -10,15 +10,24 @@ export async function GET(
     const publicId = params.id
     const supabase = getSupabaseServerClient()
 
-    // Get animal with owner info
+    // Get animal with tag and ranch info (v1.0 schema)
     const { data: animal, error } = await supabase
       .from('animals')
       .select(`
         *,
-        owners (
+        tags (
+          tag_code,
+          token_id,
+          mint_tx_hash,
+          chain,
+          contract_address,
+          status,
+          activation_state
+        ),
+        ranches (
           id,
-          basename,
-          email
+          name,
+          contact_email
         )
       `)
       .eq('public_id', publicId)

@@ -17,11 +17,25 @@ export default function StartPage() {
     birthYear: new Date().getFullYear() - 1,
   })
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Check if token looks like a tag_code (RL-XXX format)
+  const isTagCode = (token: string) => {
+    return /^RL-\d+$/i.test(token.trim())
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError(null)
 
+    // If token looks like a tag_code, redirect to v1.0 flow
+    if (isTagCode(formData.token)) {
+      router.push(`/t/${formData.token.trim().toUpperCase()}`)
+      return
+    }
+
+    // Otherwise, try legacy claim flow
     try {
       const response = await fetch('/api/claim', {
         method: 'POST',
@@ -34,10 +48,10 @@ export default function StartPage() {
       if (data.success) {
         router.push(`/a?id=${data.public_id}`)
       } else {
-        alert(data.error || 'Failed to claim tag')
+        setError(data.error || 'Failed to claim tag')
       }
     } catch (error) {
-      alert('Error claiming tag')
+      setError('Error claiming tag. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -102,9 +116,13 @@ export default function StartPage() {
                     required
                   />
                   <p className="text-sm text-[var(--c4)] mt-2">
-                    Scan the overlay QR code on your tag, or enter the token
-                    manually
+                    Scan the QR code on your tag, or enter the tag code (e.g., RL-001)
                   </p>
+                  {error && (
+                    <div className="mt-2 p-3 bg-red-900/20 border border-red-700/50 rounded text-red-400 text-sm">
+                      {error}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -249,9 +267,9 @@ export default function StartPage() {
                   <button
                     type="submit"
                     className="btn-primary flex-1"
-                    disabled={loading || !formData.email || !formData.animalName}
+                    disabled={loading || !formData.token}
                   >
-                    {loading ? 'Claiming...' : 'Claim Tag'}
+                    {loading ? 'Processing...' : isTagCode(formData.token) ? 'Continue to Tag' : 'Claim Tag'}
                   </button>
                 </div>
               </div>

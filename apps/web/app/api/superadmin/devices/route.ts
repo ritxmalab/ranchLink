@@ -37,15 +37,83 @@ export async function GET(request: Request) {
     const limitParam = url.searchParams.get('limit')
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 200, 500) : 200
 
-    // Query devices - don't select created_at if it doesn't exist
+    // Query tags table (v1.0 canonical source)
+    // Map to Device format for UI compatibility
     let query = supabase
-      .from('devices')
-      .select('id, tag_id, claim_token, public_id, overlay_qr_url, base_qr_url, status, serial, type, metadata')
+      .from('tags')
+      .select(`
+        id,
+        tag_code,
+        token_id,
+        mint_tx_hash,
+        chain,
+        contract_address,
+        status,
+        activation_state,
+        animal_id,
+        batch_id,
+        ranches(id, name),
+        animals(public_id)
+      `)
       .limit(limit)
     
-    // Try to order by created_at, but it might not exist
-    // Order by id as fallback
-    const { data, error } = await query.order('id', { ascending: false })
+    const { data: tagsData, error } = await query.order('created_at', { ascending: false })
+    
+    // Get batch info for tags that have batch_id
+    const batchIds = [...new Set((tagsData || []).map((t: any) => t.batch_id).filter(Boolean))]
+    let batchesMap: Record<string, any> = {}
+    
+    if (batchIds.length > 0) {
+      const { data: batches } = await supabase
+        .from('batches')
+        .select('id, name, model, material, color, created_at')
+        .in('id', batchIds)
+      
+      if (batches) {
+        batchesMap = batches.reduce((acc: any, batch: any) => {
+          acc[batch.id] = batch
+          return acc
+        }, {})
+      }
+    }
+    
+    // Map tags to Device format for backward compatibility
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+    const data = (tagsData || []).map((tag: any) => {
+      const batch = tag.batch_id ? batchesMap[tag.batch_id] : null
+      return {
+        id: tag.id,
+        tag_id: tag.tag_code,
+        tag_code: tag.tag_code,
+        public_id: tag.animals?.public_id || null,
+        token_id: tag.token_id,
+        mint_tx_hash: tag.mint_tx_hash,
+        chain: tag.chain || 'BASE',
+        contract_address: tag.contract_address,
+        status: tag.status || 'in_inventory',
+        activation_state: tag.activation_state || 'active',
+        // Generate base_qr_url from tag_code
+        base_qr_url: tag.tag_code ? `${appUrl}/t/${tag.tag_code}` : '',
+        overlay_qr_url: '', // v1.0 doesn't use overlay
+        claim_token: '', // v1.0 doesn't use claim_token
+        serial: tag.tag_code,
+        type: null,
+        material: batch?.material || null,
+        model: batch?.model || null,
+        color: batch?.color || null,
+        batch_name: batch?.name || null,
+        batch_date: batch?.created_at ? new Date(batch.created_at).toISOString().slice(0, 10) : null,
+        metadata: {
+          material: batch?.material || null,
+          model: batch?.model || null,
+          chain: tag.chain || 'BASE',
+          color: batch?.color || null,
+          batch_name: batch?.name || null,
+          batch_date: batch?.created_at ? new Date(batch.created_at).toISOString().slice(0, 10) : null,
+          code: tag.tag_code,
+        },
+      }
+    })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

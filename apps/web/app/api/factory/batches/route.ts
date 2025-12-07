@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
-import { mintTag, hashPublicId } from '@/lib/blockchain/ranchLinkTag'
+import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
+import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
 import { pinAnimalMetadata } from '@/lib/ipfs/client'
 
 /**
@@ -82,16 +83,16 @@ export async function POST(request: NextRequest) {
     const slug = batchName.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 4)
 
     // Get current max tag number for sequential codes
-    // Use devices table for now (v0.9 compatibility)
-    const { data: existingDevices } = await supabase
-      .from('devices')
-      .select('tag_id')
-      .order('id', { ascending: false })
+    // Use tags table (v1.0 canonical source)
+    const { data: existingTags } = await supabase
+      .from('tags')
+      .select('tag_code')
+      .order('created_at', { ascending: false })
       .limit(1)
 
     let startNumber = 1
-    if (existingDevices && existingDevices.length > 0) {
-      const lastCode = existingDevices[0].tag_id
+    if (existingTags && existingTags.length > 0) {
+      const lastCode = existingTags[0].tag_code
       if (lastCode) {
         const match = lastCode.match(/RL-(\d+)/)
         if (match) {
@@ -107,30 +108,25 @@ export async function POST(request: NextRequest) {
       const publicId = `AUS${String(tagNumber).padStart(4, '0')}`
       const code = `RL-${batchDate}-${slug}-${String(tagNumber).padStart(4, '0')}`
 
-      // Create device/tag row (before minting)
-      // Use devices table for v0.9 compatibility, will migrate to tags later
+      // Get contract from registry (supports multiple contracts/standards)
+      const contract = await getDefaultCattleContract()
+      let contractAddress = contract?.contract_address || process.env.RANCHLINKTAG_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_TAG || ''
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+      
       const { data: tag, error: tagError } = await supabase
-        .from('devices')
+        .from('tags')
         .insert({
-          tag_id: tagCode,
+          tag_code: tagCode,
+          chain: chain || 'BASE',
+          contract_address: contractAddress,
+          token_id: null, // Will be set after minting
+          mint_tx_hash: null, // Will be set after minting
           batch_id: batch.id,
-          type: model,
-          serial: code,
-          public_id: publicId,
-          status: 'printed',
-          base_qr_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'}/t/${tagCode}`,
-          metadata: {
-            material,
-            model,
-            chain,
-            color,
-            batch_name: batchName,
-            batch_date: new Date().toISOString().slice(0, 10),
-            code,
-            tag_code: tagCode,
-          },
+          ranch_id: targetRanchId || null,
+          status: 'in_inventory',
+          activation_state: 'active',
         })
-        .select('id')
+        .select('id, tag_code')
         .single()
 
       if (tagError || !tag) {
@@ -160,29 +156,38 @@ export async function POST(request: NextRequest) {
           // Continue without CID - can be updated later
         }
 
-        // Mint the NFT
-        const mintResult = await mintTag(tagCode, publicId, cid)
+        // Mint the NFT using unified minting (supports multiple standards)
+        // TODO: LastBurner / Non-custodial Support
+        // - Currently mints to server wallet (custodial model)
+        // - Future: For LastBurner kits, pass recipientAddress (Burner card address)
+        // - Tags table already supports this via contract_address field
+        const mintResult = await mintTagUnified({
+          tagCode,
+          publicId,
+          cid,
+          assetType: 'cattle', // Can be changed to 'licensed_products' for ERC-3643
+          // recipientAddress: burnerAddress, // Future: for LastBurner kits
+        })
         tokenId = mintResult.tokenId
         mintTxHash = mintResult.txHash
+        
+        // Update contract_address if different from default
+        if (mintResult.contractAddress && mintResult.contractAddress !== contractAddress) {
+          contractAddress = mintResult.contractAddress
+          
+          // Update tag with correct contract address
+          await supabase
+            .from('tags')
+            .update({ contract_address: contractAddress })
+            .eq('id', tag.id)
+        }
 
-        // Update device with token ID and transaction hash
-        // Reconstruct metadata since we only selected 'id' in the insert query
+        // Update tag with token ID and transaction hash
         await supabase
-          .from('devices')
+          .from('tags')
           .update({
-            token_id: tokenId.toString(),
-            metadata: {
-              material,
-              model,
-              chain,
-              color,
-              batch_name: batchName,
-              batch_date: new Date().toISOString().slice(0, 10),
-              code,
-              tag_code: tagCode,
-              mint_tx_hash: mintTxHash,
-              token_id: tokenId.toString(),
-            },
+            token_id: tokenId ? tokenId.toString() : null,
+            mint_tx_hash: mintTxHash,
           })
           .eq('id', tag.id)
       } catch (mintError: any) {
@@ -191,24 +196,21 @@ export async function POST(request: NextRequest) {
       }
 
       // 4. Generate QR URL
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
       const baseQrUrl = `${appUrl}/t/${tagCode}`
 
       tags.push({
         id: tag.id,
         tag_code: tagCode,
-        tag_id: tagCode,
         public_id: publicId,
-        code,
         token_id: tokenId ? tokenId.toString() : null,
-        mint_tx_hash: mintTxHash,
+        mint_tx_hash: mintTxHash || null,
         base_qr_url: baseQrUrl,
-        material,
-        model,
-        color,
-        chain,
-        batch_name: batchName,
-        status: 'printed',
+        chain: chain || 'BASE',
+        contract_address: contractAddress,
+        status: 'in_inventory',
+        activation_state: 'active',
+        batch_id: batch.id,
+        ranch_id: targetRanchId || null,
       })
     }
 
@@ -232,20 +234,18 @@ export async function POST(request: NextRequest) {
         kitId = kit.id
 
         // Link tags to kit (first kitSize tags)
-        // Note: kit_tags table might not exist yet if migration not run
-        // This will be enabled after v1.0 migration
         try {
-          const kitTagLinks = tags.slice(0, kitSize).map(tag => ({
+          const kitTagLinks = tags.slice(0, kitSize).map(tagData => ({
             kit_id: kit.id,
-            tag_id: tag.id,
+            tag_id: tagData.id,
           }))
 
           if (kitTagLinks.length > 0) {
             await supabase.from('kit_tags').insert(kitTagLinks)
           }
         } catch (kitLinkError) {
-          console.warn('Kit tags linking failed (table might not exist yet):', kitLinkError)
-          // Continue - kit exists, linking can be done after migration
+          console.warn('Kit tags linking failed:', kitLinkError)
+          // Continue - kit exists, linking can be done later
         }
       }
     }
@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
       batch: {
         id: batch.id,
         name: batchName,
-        size: batchSize,
+        count: batchSize,
       },
       tags,
       kit: kitId ? { id: kitId } : null,

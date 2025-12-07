@@ -2,17 +2,30 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 
 interface Animal {
   public_id: string
-  animal_name: string
+  name: string
+  animal_name?: string
   species: string
   breed: string | null
   birth_year: number | null
+  sex?: string | null
   status: string
-  tag_id: string
-  owners: {
-    basename: string | null
+  tags?: Array<{
+    tag_code: string
+    token_id: string | null
+    mint_tx_hash: string | null
+    chain: string
+    contract_address: string | null
+    status: string
+    activation_state: string
+  }>
+  ranches?: {
+    id: string
+    name: string
+    contact_email: string | null
   }
 }
 
@@ -84,7 +97,7 @@ export default function AnimalCardPage() {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold">{animal.animal_name}</h1>
+                <h1 className="text-4xl font-bold">{animal.name || animal.animal_name}</h1>
                 <span className="px-3 py-1 bg-[var(--c3)] text-[var(--c1)] rounded-full text-sm font-semibold">
                   {animal.status}
                 </span>
@@ -92,15 +105,49 @@ export default function AnimalCardPage() {
               <p className="text-xl text-[var(--c4)]">
                 Public ID: <span className="font-mono font-semibold text-white">{animal.public_id}</span>
               </p>
-              {animal.owners?.basename && (
+              {animal.ranches?.name && (
                 <p className="text-[var(--c4)] mt-1">
-                  Ranch: <span className="font-semibold text-white">{animal.owners.basename}</span>
+                  Ranch: <span className="font-semibold text-white">{animal.ranches.name}</span>
                 </p>
+              )}
+              {animal.tags && animal.tags.length > 0 && animal.tags[0] && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-[var(--c4)]">
+                    Tag: <span className="font-mono font-semibold text-white">{animal.tags[0].tag_code}</span>
+                  </p>
+                  {animal.tags[0].token_id && (
+                    <div className="flex items-center gap-2">
+                      <p className="text-[var(--c4)]">
+                        Token ID: <span className="font-mono font-semibold text-white">#{animal.tags[0].token_id}</span>
+                      </p>
+                      <a
+                        href={getBasescanUrl(BigInt(animal.tags[0].token_id))}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--c2)] hover:underline text-sm"
+                      >
+                        View on Basescan →
+                      </a>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[var(--c4)]">On-chain Status:</span>
+                    {animal.tags[0].token_id && animal.tags[0].contract_address ? (
+                      <span className="px-2 py-1 bg-green-900/20 text-green-400 rounded text-xs font-semibold">
+                        ✅ ON-CHAIN
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-yellow-900/20 text-yellow-400 rounded text-xs font-semibold">
+                        ⚪ OFF-CHAIN
+                      </span>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             <div className="text-right">
               <div className="w-24 h-24 bg-gradient-to-br from-[var(--c2)] to-[var(--c3)] rounded-full flex items-center justify-center text-white text-4xl font-bold shadow-lg">
-                {animal.animal_name.charAt(0)}
+                {(animal.name || animal.animal_name || 'A').charAt(0).toUpperCase()}
               </div>
             </div>
           </div>
