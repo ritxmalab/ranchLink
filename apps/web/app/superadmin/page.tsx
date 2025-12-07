@@ -157,8 +157,8 @@ export default function SuperAdminPage() {
         token_id: tag.token_id,
         mint_tx_hash: tag.mint_tx_hash,
         base_qr_url: tag.base_qr_url,
-        overlay_qr_url: '',
-        claim_token: '',
+        overlay_qr_url: '', // v1.0: NO OVERLAY - deprecated
+        claim_token: '', // v1.0: NO CLAIM TOKEN - deprecated
         status: tag.status || 'in_inventory',
         activation_state: tag.activation_state || 'active',
         chain: tag.chain || 'BASE',
