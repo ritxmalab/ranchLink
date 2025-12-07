@@ -711,11 +711,11 @@ export default function SuperAdminPage() {
                                   ⚪ OFF-CHAIN
                                 </span>
                                 <button
-                                  onClick={async () => {
+                                  onClick={async (e) => {
                                     if (!confirm(`Retry mint for ${device.tag_code}?\n\nThis will attempt to mint the NFT on Base Mainnet.`)) return
                                     
                                     // Show loading state
-                                    const button = event.currentTarget
+                                    const button = e.currentTarget
                                     const originalText = button.textContent
                                     button.disabled = true
                                     button.textContent = '⏳ Minting...'
@@ -751,10 +751,12 @@ export default function SuperAdminPage() {
                                       alert(`❌ Network Error: ${err.message}\n\nPlease check your connection and try again.`)
                                     } finally {
                                       button.disabled = false
-                                      button.textContent = originalText
+                                      if (button.textContent !== null) {
+                                        button.textContent = originalText
+                                      }
                                     }
                                   }}
-                                  className="px-2 py-1 bg-[var(--c2)] text-white rounded text-xs hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="px-2 py-1 bg-[var(--c2)] text-white rounded text-xs hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                                   title="Retry mint for this tag"
                                 >
                                   🔄 Retry Mint
