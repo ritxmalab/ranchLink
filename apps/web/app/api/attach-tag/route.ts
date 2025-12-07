@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = getSupabaseServerClient()
 
-    // 1. Load tag from tags table
+    // 1. Load tag from tags table (v1.0: tag MUST be on-chain before attach)
     const { data: tag, error: tagError } = await supabase
       .from('tags')
-      .select('id, tag_code, animal_id, ranch_id, status')
+      .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash')
       .eq('tag_code', tagCode)
       .single()
 
@@ -45,7 +45,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. Verify authentication and ownership
+    // 2. Verify tag is on-chain (v1.0 requirement: mint must complete before attach)
+    if (!tag.token_id || !tag.contract_address) {
+      return NextResponse.json(
+        {
+          error: 'Tag is not on-chain',
+          message: 'This tag has not been minted yet. Tags must be minted on-chain before they can be attached to an animal.',
+          tag_code: tag.tag_code,
+          status: tag.status,
+          suggestion: tag.status === 'mint_failed'
+            ? 'The mint failed during batch creation. Please use the Retry Mint button in the Inventory tab to complete the mint.'
+            : 'Please wait for the mint to complete, or use Retry Mint if it failed.',
+        },
+        { status: 400 }
+      )
+    }
+
+    // 3. Verify authentication and ownership
     // TODO: Implement Supabase Auth check
     // For now, allow if tag.ranch_id is null or if user's ranch_id matches
     // const { data: { user } } = await supabase.auth.getUser()
@@ -60,7 +76,7 @@ export async function POST(request: NextRequest) {
     // For v1.0, we'll allow attachment if tag.ranch_id is null or if explicitly allowed
     // In production, implement proper auth check above
 
-    // 3. Create or update animal
+    // 4. Create or update animal
     let animalId: string
     let publicId: string
 
@@ -138,7 +154,7 @@ export async function POST(request: NextRequest) {
       publicId = newAnimal.public_id
     }
 
-    // 4. Update tag
+    // 5. Update tag
     const { error: updateError } = await supabase
       .from('tags')
       .update({

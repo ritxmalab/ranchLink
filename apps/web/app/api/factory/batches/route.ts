@@ -134,10 +134,11 @@ export async function POST(request: NextRequest) {
         continue // Skip this tag but continue with others
       }
 
-      // 3. Mint NFT on blockchain
+      // 3. Mint NFT on blockchain (BLOCKING - must complete before tag is usable)
       let tokenId: bigint | null = null
       let mintTxHash: string | null = null
       let cid: string = ''
+      let mintError: any = null
 
       try {
         // Pin metadata to IPFS first (optional, can be empty initially)
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Mint the NFT using unified minting (supports multiple standards)
+        // CRITICAL: This must succeed for the tag to be usable
         // TODO: LastBurner / Non-custodial Support
         // - Currently mints to server wallet (custodial model)
         // - Future: For LastBurner kits, pass recipientAddress (Burner card address)
@@ -183,35 +185,58 @@ export async function POST(request: NextRequest) {
         }
 
         // Update tag with token ID and transaction hash
-        await supabase
+        const { error: updateError } = await supabase
           .from('tags')
           .update({
             token_id: tokenId ? tokenId.toString() : null,
             mint_tx_hash: mintTxHash,
+            status: tokenId ? 'in_inventory' : 'mint_failed', // Mark as failed if no token_id
           })
           .eq('id', tag.id)
-      } catch (mintError: any) {
-        console.error(`Failed to mint tag ${tagCode}:`, mintError)
-        // Continue - tag exists in DB, minting can be retried later
+
+        if (updateError) {
+          console.error(`Failed to update tag ${tagCode} after mint:`, updateError)
+        }
+      } catch (error: any) {
+        mintError = error
+        console.error(`Failed to mint tag ${tagCode}:`, error)
+        
+        // Mark tag as mint_failed in database
+        await supabase
+          .from('tags')
+          .update({
+            status: 'mint_failed',
+          })
+          .eq('id', tag.id)
+        
+        // Don't continue - this tag is not usable until mint succeeds
+        // We'll include it in the response with error status
       }
 
-      // 4. Generate QR URL
-      const baseQrUrl = `${appUrl}/t/${tagCode}`
+      // 4. Generate QR URL (only if mint succeeded)
+      // CRITICAL: Only include tags that successfully minted in the response
+      // Tags that failed mint should NOT be included as "ready" - they need retry
+      if (tokenId) {
+        const baseQrUrl = `${appUrl}/t/${tagCode}`
 
-      tags.push({
-        id: tag.id,
-        tag_code: tagCode,
-        public_id: publicId,
-        token_id: tokenId ? tokenId.toString() : null,
-        mint_tx_hash: mintTxHash || null,
-        base_qr_url: baseQrUrl,
-        chain: chain || 'BASE',
-        contract_address: contractAddress,
-        status: 'in_inventory',
-        activation_state: 'active',
-        batch_id: batch.id,
-        ranch_id: targetRanchId || null,
-      })
+        tags.push({
+          id: tag.id,
+          tag_code: tagCode,
+          public_id: publicId,
+          token_id: tokenId.toString(),
+          mint_tx_hash: mintTxHash || null,
+          base_qr_url: baseQrUrl,
+          chain: chain || 'BASE',
+          contract_address: contractAddress,
+          status: 'in_inventory', // Only in_inventory if mint succeeded
+          activation_state: 'active', // Only active if on-chain
+          batch_id: batch.id,
+          ranch_id: targetRanchId || null,
+        })
+      } else {
+        // Tag failed to mint - don't include in "ready" tags, but log it
+        console.error(`Tag ${tagCode} failed to mint and will not be included in ready tags. Error:`, mintError?.message)
+      }
     }
 
     // 5. Handle kit mode if enabled
@@ -250,22 +275,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. Update batch status
+    // 6. Calculate mint statistics
+    const successfulMints = tags.filter(t => t.token_id !== null).length
+    const failedMints = tags.filter(t => t.token_id === null).length
+
+    // 7. Update batch status
+    // Only mark as 'printed' if all tags were successfully minted
+    const batchStatus = failedMints === 0 ? 'printed' : 'partial'
     await supabase
       .from('batches')
-      .update({ status: 'printed' })
+      .update({ status: batchStatus })
       .eq('id', batch.id)
 
+    // 8. Return response with mint status
     return NextResponse.json({
-      success: true,
+      success: failedMints === 0, // Only fully successful if all mints succeeded
       batch: {
         id: batch.id,
         name: batchName,
         count: batchSize,
+        status: batchStatus,
       },
       tags,
       kit: kitId ? { id: kitId } : null,
-      message: `Successfully created batch with ${tags.length} tags`,
+      mint_summary: {
+        total: tags.length,
+        successful: successfulMints,
+        failed: failedMints,
+      },
+      message: failedMints === 0
+        ? `Successfully created batch with ${tags.length} tags (all minted on-chain)`
+        : `Created batch with ${tags.length} tags, but ${failedMints} failed to mint. Use Retry Mint to complete them.`,
+      warnings: failedMints > 0 ? [
+        `${failedMints} tag(s) failed to mint. They are marked as 'mint_failed' and cannot be attached until minted.`,
+        'Check server wallet balance, RPC connection, and MINTER_ROLE permissions.',
+        'Use the Retry Mint button in Inventory to retry failed mints.',
+      ] : [],
     })
   } catch (error: any) {
     console.error('Factory batch creation error:', error)

@@ -192,11 +192,11 @@ export default function SuperAdminPage() {
       
       let message = ''
       if (tagsWithTokenId === data.tags.length) {
-        message = `✅ Successfully generated ${data.tags.length} tags with NFTs minted on Base Mainnet. All tags are on-chain and ready to use.`
+        message = `✅ Successfully generated ${data.tags.length} tags with NFTs minted on Base Mainnet. All tags are on-chain and ready to attach to animals.`
       } else if (tagsWithTokenId > 0) {
-        message = `⚠️ Generated ${data.tags.length} tags. ${onChainCount} are on-chain (minted), ${pendingCount} are pending mint. Tags are saved in database and can be used immediately.`
+        message = `⚠️ Generated ${data.tags.length} tags, but ${data.mint_summary?.failed || 0} failed to mint. ${data.mint_summary?.successful || 0} are on-chain and ready to use. Failed tags cannot be attached until minted - use Retry Mint in Inventory.`
       } else {
-        message = `⚠️ Generated ${data.tags.length} tags. Minting is pending. Tags are saved in database and will be minted automatically.`
+        message = `❌ Generated ${data.tags.length} tags, but all mints failed. Tags are saved but cannot be attached until minted. Check server wallet balance, RPC connection, and MINTER_ROLE. Use Retry Mint in Inventory to complete mints.`
       }
       
       setMessage(message)
@@ -512,7 +512,7 @@ export default function SuperAdminPage() {
                               Tag ID: {device.tag_code || device.tag_id}
                             </div>
                             <div className={`text-base font-bold ${device.token_id ? 'text-green-600' : 'text-yellow-600'}`}>
-                              Token ID: {device.token_id ? `#${device.token_id}` : 'Pending'}
+                              Token ID: {device.token_id ? `#${device.token_id}` : '❌ NOT READY'}
                             </div>
                             <div className="text-sm text-gray-600">
                               Animal ID: {device.public_id || 'Not attached'}
@@ -588,10 +588,26 @@ export default function SuperAdminPage() {
                           </div>
                         </div>
                       )
-                    })}
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Message if no tags are ready */}
+                    {readyToPrint.length === 0 && (
+                      <div className="text-center py-8 p-4 bg-red-900/20 border border-red-700/50 rounded-lg">
+                        <p className="text-red-400 font-semibold mb-2">❌ No tags ready for printing</p>
+                        <p className="text-red-300 text-sm">
+                          All {devices.length} tag(s) failed to mint. Complete the mint process first before printing.
+                        </p>
+                        <p className="text-red-300 text-sm mt-2">
+                          Go to <strong>Inventory</strong> tab and use <strong>Retry Mint</strong> for each tag.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {devices.length === 0 && !isSaving && (
                 <div className="text-center py-12">

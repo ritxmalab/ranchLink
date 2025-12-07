@@ -222,9 +222,32 @@ export default function TagScanPage({ params }: PageProps) {
           <div className="card bg-gradient-to-br from-blue-900/20 to-purple-900/20 border-2 border-blue-700/50">
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Attach Tag to Animal</h2>
-              <p className="text-[var(--c4)]">
-                This tag is ready to be linked to an animal. Fill out the information below to create the animal record.
-              </p>
+              
+              {/* v1.0: Tag MUST be on-chain before attach */}
+              {onChainStatus === 'off-chain' && (
+                <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                  <p className="text-yellow-400 font-semibold mb-2">⚠️ Tag Not On-Chain</p>
+                  <p className="text-yellow-300 text-sm mb-2">
+                    This tag has not been minted on the blockchain yet. Tags must be minted before they can be attached to an animal.
+                  </p>
+                  {tag.status === 'mint_failed' && (
+                    <p className="text-yellow-300 text-sm">
+                      The mint failed during batch creation. Please use the <strong>Retry Mint</strong> button in the Super Admin Inventory tab to complete the mint.
+                    </p>
+                  )}
+                  {tag.status !== 'mint_failed' && (
+                    <p className="text-yellow-300 text-sm">
+                      Please wait for the mint to complete, or contact support if this persists.
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {onChainStatus === 'on-chain' && (
+                <p className="text-[var(--c4)]">
+                  This tag is on-chain and ready to be linked to an animal. Fill out the information below to create the animal record.
+                </p>
+              )}
             </div>
 
             {attachSuccess && (
@@ -239,7 +262,7 @@ export default function TagScanPage({ params }: PageProps) {
               </div>
             )}
 
-            <form onSubmit={handleAttach} className="space-y-4">
+            <form onSubmit={handleAttach} className="space-y-4" style={{ opacity: onChainStatus === 'off-chain' ? 0.5 : 1 }}>
               <div>
                 <label className="block text-sm font-medium mb-2">
                   Animal Name *
@@ -332,7 +355,7 @@ export default function TagScanPage({ params }: PageProps) {
                 <button
                   type="submit"
                   className="btn-primary flex-1"
-                  disabled={attaching || !formData.animalName || !formData.species}
+                  disabled={attaching || !formData.animalName || !formData.species || onChainStatus === 'off-chain'}
                 >
                   {attaching ? 'Attaching...' : 'Attach Animal'}
                 </button>
