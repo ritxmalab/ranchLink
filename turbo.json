@@ -31,7 +31,8 @@
         "CDP_WALLET_SECRET",
         "SERVER_WALLET_ADDRESS",
         "SERVER_SOLANA_ADDRESS",
-        "EXPO_PUBLIC_SUPABASE_KEY"
+        "EXPO_PUBLIC_SUPABASE_KEY",
+        "RANCHLINKTAG_ADDRESS"
       ],
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**", "build/**"]
