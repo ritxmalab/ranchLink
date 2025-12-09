@@ -60,8 +60,10 @@ function getContractAddress(): `0x${string}` {
 /**
  * Get wallet client for minting (server-side only)
  * CRITICAL: Must use Base Mainnet (8453) and correct RPC URL
+ * 
+ * EXPORTED for diagnostics - do not use directly, use mintTag() instead
  */
-function getWalletClient() {
+export function getWalletClient() {
   const privateKey = process.env.SERVER_WALLET_PRIVATE_KEY
   if (!privateKey) {
     throw new Error('Missing SERVER_WALLET_PRIVATE_KEY environment variable')
@@ -126,29 +128,62 @@ export async function mintTag(
   cid: string = '',
   recipientAddress?: `0x${string}`
 ): Promise<{ tokenId: bigint; txHash: `0x${string}` }> {
+  // Pre-flight checks with detailed error messages
+  const contractAddress = getContractAddress()
+  if (!contractAddress) {
+    throw new Error('Contract address not configured. Check RANCHLINKTAG_ADDRESS or NEXT_PUBLIC_CONTRACT_TAG env var.')
+  }
+
+  const privateKey = process.env.SERVER_WALLET_PRIVATE_KEY
+  if (!privateKey) {
+    throw new Error('SERVER_WALLET_PRIVATE_KEY not configured')
+  }
+
   try {
-    const contractAddress = getContractAddress()
     const walletClient = getWalletClient()
     // TODO: For LastBurner kits, recipientAddress will be the Burner card address
     // For now, default to server wallet (custodial)
     const recipient = recipientAddress || walletClient.account.address
 
+    console.error('[MINT] Starting mint process:', {
+      tagCode,
+      publicId,
+      contractAddress,
+      recipient,
+      chainId: walletClient.chain.id,
+    })
+
     // Hash the public ID
     const publicIdHash = hashPublicId(publicId)
+    console.error('[MINT] Public ID hash:', publicIdHash)
 
     // Call mintTo function
+    console.error('[MINT] Calling writeContract...')
     const hash = await walletClient.writeContract({
       address: contractAddress,
       abi: RANCHLINK_TAG_ABI,
       functionName: 'mintTo',
-      args: [recipient, publicIdHash, cid],
+      args: [recipient, publicIdHash, cid || ''],
     })
+
+    console.error('[MINT] Transaction sent, hash:', hash)
+    console.error('[MINT] Waiting for receipt...')
 
     // Wait for transaction receipt
     const receipt = await publicClient.waitForTransactionReceipt({ hash })
+    console.error('[MINT] Transaction confirmed:', {
+      blockNumber: receipt.blockNumber.toString(),
+      status: receipt.status,
+      gasUsed: receipt.gasUsed.toString(),
+    })
+
+    if (receipt.status === 'reverted') {
+      throw new Error(`Transaction reverted. Hash: ${hash}`)
+    }
 
     // Get token ID using the contract's getTokenId function
     // This is more reliable than parsing events
+    console.error('[MINT] Fetching token ID...')
     const tokenId = await publicClient.readContract({
       address: contractAddress,
       abi: RANCHLINK_TAG_ABI,
@@ -156,16 +191,34 @@ export async function mintTag(
       args: [publicIdHash],
     }) as bigint
 
+    console.error('[MINT] Token ID retrieved:', tokenId.toString())
+
     if (!tokenId || tokenId === BigInt(0)) {
-      throw new Error('Failed to get token ID after minting')
+      throw new Error(`Failed to get token ID after minting. Transaction hash: ${hash}`)
     }
+
+    console.error('[MINT] ✅ Mint successful:', {
+      tokenId: tokenId.toString(),
+      txHash: hash,
+      basescan: `https://basescan.org/tx/${hash}`,
+    })
 
     return {
       tokenId,
       txHash: hash,
     }
   } catch (error: any) {
-    throw new Error(`Failed to mint tag: ${error.message}`)
+    // Enhanced error message with context
+    const errorMessage = error.message || 'Unknown error'
+    const errorDetails = {
+      tagCode,
+      publicId,
+      contractAddress,
+      error: errorMessage,
+      stack: error.stack,
+    }
+    console.error('[MINT] ❌ Mint failed:', errorDetails)
+    throw new Error(`Failed to mint tag ${tagCode}: ${errorMessage}`)
   }
 }
 

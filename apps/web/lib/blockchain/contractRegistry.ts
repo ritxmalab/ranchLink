@@ -35,13 +35,14 @@ export async function getContractForAsset(assetType: AssetType): Promise<Contrac
   const supabase = getSupabaseServerClient();
   
   // Query contracts table for contracts that handle this asset type
+  // Use array contains operator for PostgreSQL array column
   const { data, error } = await supabase
     .from('contracts')
     .select('*')
-    .contains('default_for', [assetType])
+    .contains('default_for', [assetType]) // PostgreSQL array contains operator
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() to handle no results gracefully
 
   if (error || !data) {
     console.warn(`No contract found for asset type: ${assetType}`, error);
@@ -70,7 +71,7 @@ export async function getContractByAddress(address: string): Promise<ContractCon
     .from('contracts')
     .select('*')
     .eq('contract_address', address.toLowerCase())
-    .single();
+    .maybeSingle(); // Use maybeSingle() to handle no results gracefully
 
   if (error || !data) {
     return null;
