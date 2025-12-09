@@ -169,13 +169,47 @@ export async function mintTag(
     console.error('[MINT] Transaction sent, hash:', hash)
     console.error('[MINT] Waiting for receipt...')
 
-    // Wait for transaction receipt
-    const receipt = await publicClient.waitForTransactionReceipt({ hash })
-    console.error('[MINT] Transaction confirmed:', {
-      blockNumber: receipt.blockNumber.toString(),
-      status: receipt.status,
-      gasUsed: receipt.gasUsed.toString(),
-    })
+    // Wait for transaction receipt with increased timeout (Base can be slow)
+    // Base mainnet typically confirms in 2-3 seconds, but we allow up to 60 seconds
+    let receipt
+    try {
+      receipt = await publicClient.waitForTransactionReceipt({ 
+        hash,
+        timeout: 60000, // 60 seconds timeout
+        confirmations: 1, // Wait for 1 confirmation
+      })
+      console.error('[MINT] Transaction confirmed:', {
+        blockNumber: receipt.blockNumber.toString(),
+        status: receipt.status,
+        gasUsed: receipt.gasUsed.toString(),
+      })
+    } catch (timeoutError: any) {
+      // If timeout, try to get the receipt anyway (transaction might have completed)
+      console.error('[MINT] Timeout waiting for receipt, checking transaction status...')
+      try {
+        receipt = await publicClient.getTransactionReceipt({ hash })
+        if (receipt) {
+          console.error('[MINT] Transaction found after timeout:', {
+            blockNumber: receipt.blockNumber.toString(),
+            status: receipt.status,
+          })
+        } else {
+          // Transaction not found yet, but might be pending
+          // Check transaction status
+          const tx = await publicClient.getTransaction({ hash })
+          if (tx) {
+            console.error('[MINT] Transaction is pending, hash:', hash)
+            // Return the hash anyway - the transaction is submitted and will complete
+            // The frontend can check the status later
+            throw new Error(`Transaction submitted but not yet confirmed. Hash: ${hash}. Check Basescan: https://basescan.org/tx/${hash}`)
+          }
+          throw timeoutError
+        }
+      } catch (checkError: any) {
+        // If we can't get the receipt, throw the original timeout error
+        throw new Error(`Transaction timeout. Hash: ${hash}. The transaction may still be processing. Check Basescan: https://basescan.org/tx/${hash}`)
+      }
+    }
 
     if (receipt.status === 'reverted') {
       throw new Error(`Transaction reverted. Hash: ${hash}`)
