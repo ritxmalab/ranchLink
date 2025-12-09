@@ -49,8 +49,11 @@ export async function POST(request: NextRequest) {
       const balanceEth = formatEther(balance)
       checks.push(`✓ Server wallet balance: ${balanceEth} ETH`)
       
-      if (parseFloat(balanceEth) < 0.001) {
-        errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.001 ETH)`)
+      // Base mainnet gas is very cheap, minimum is 0.0001 ETH
+      if (parseFloat(balanceEth) < 0.0001) {
+        errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.0001 ETH)`)
+      } else if (parseFloat(balanceEth) < 0.001) {
+        checks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.001+ ETH)`)
       }
     } catch (balanceError: any) {
       errors.push(`Could not check balance: ${balanceError.message}`)

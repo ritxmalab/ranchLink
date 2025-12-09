@@ -100,8 +100,13 @@ export async function POST(request: NextRequest) {
       const balanceEth = formatEther(balance)
       preflightChecks.push(`✓ Server wallet balance: ${balanceEth} ETH`)
       
-      if (parseFloat(balanceEth) < 0.001) {
-        preflightErrors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.001 ETH for gas)`)
+      // Base mainnet gas is very cheap (~$0.01-0.05 per mint)
+      // Minimum balance: 0.0001 ETH should be enough for 1-2 mints
+      if (parseFloat(balanceEth) < 0.0001) {
+        preflightErrors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.0001 ETH for gas)`)
+      } else if (parseFloat(balanceEth) < 0.001) {
+        // Warn but don't block if balance is low but above minimum
+        preflightChecks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.001+ ETH for multiple mints)`)
       }
     } catch (balanceError: any) {
       console.warn('[FACTORY] Could not check wallet balance:', balanceError.message)

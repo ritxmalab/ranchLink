@@ -38,7 +38,9 @@ export async function GET() {
     const balance = await publicClient.getBalance({ address: serverWalletAddress })
     const balanceEth = formatEther(balance)
     checks.balance = balanceEth
-    checks.balance_sufficient = parseFloat(balanceEth) >= 0.001
+    // Base mainnet gas is very cheap, minimum is 0.0001 ETH
+    checks.balance_sufficient = parseFloat(balanceEth) >= 0.0001
+    checks.balance_recommended = parseFloat(balanceEth) >= 0.001
     
     console.error('[HEALTH-MINT] Wallet balance:', balanceEth, 'ETH')
   } catch (balanceError: any) {
