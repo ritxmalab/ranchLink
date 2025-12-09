@@ -59,15 +59,19 @@ export async function GET() {
 
     const balance = await publicClient.getBalance({ address: serverWalletAddress })
     const balanceEth = formatEther(balance)
+    // Base mainnet gas is very cheap, minimum is 0.0001 ETH
     diagnostics.checks.wallet = {
       address: serverWalletAddress,
       balance_wei: balance.toString(),
       balance_eth: balanceEth,
-      sufficient: parseFloat(balanceEth) >= 0.001,
+      sufficient: parseFloat(balanceEth) >= 0.0001,
+      recommended: parseFloat(balanceEth) >= 0.001,
     }
 
-    if (parseFloat(balanceEth) < 0.001) {
-      diagnostics.errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.001 ETH)`)
+    if (parseFloat(balanceEth) < 0.0001) {
+      diagnostics.errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.0001 ETH)`)
+    } else if (parseFloat(balanceEth) < 0.001) {
+      diagnostics.warnings.push(`Low balance: ${balanceEth} ETH (recommended: 0.001+ ETH for multiple mints)`)
     }
   } catch (error: any) {
     diagnostics.errors.push(`Failed to check wallet balance: ${error.message}`)
