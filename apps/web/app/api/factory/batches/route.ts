@@ -25,7 +25,11 @@ import { pinAnimalMetadata } from '@/lib/ipfs/client'
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  console.log('[FACTORY] Starting batch creation...')
+  
+  // CRITICAL: Use console.error for Vercel logs visibility
+  console.error('[FACTORY] ========================================')
+  console.error('[FACTORY] Starting batch creation...')
+  console.error('[FACTORY] ========================================')
   
   try {
     const body = await request.json()
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Pre-flight checks for minting
-    console.log('[FACTORY] Pre-flight checks...')
+    console.error('[FACTORY] Pre-flight checks...')
     const preflightErrors: string[] = []
     const preflightChecks: string[] = []
 
@@ -117,12 +121,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('[FACTORY] Pre-flight checks passed:', preflightChecks)
+    console.error('[FACTORY] Pre-flight checks passed:', preflightChecks)
 
     const supabase = getSupabaseServerClient()
 
     // 1. Create batch row
-    console.log('[FACTORY] Creating batch in database...')
+    console.error('[FACTORY] Creating batch in database...')
     const { data: batch, error: batchError } = await supabase
       .from('batches')
       .insert({
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[FACTORY] Batch created: ${batch.id}`)
+    console.error(`[FACTORY] Batch created: ${batch.id}`)
 
     // 2. Generate tag codes and create tags
     const tags: any[] = []
@@ -172,7 +176,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`[FACTORY] Starting tag generation from RL-${String(startNumber).padStart(3, '0')}`)
+    console.error(`[FACTORY] Starting tag generation from RL-${String(startNumber).padStart(3, '0')}`)
 
     // Generate tags and mint them
     const mintResults: Array<{ tagCode: string; success: boolean; tokenId?: string; error?: string }> = []
@@ -182,7 +186,7 @@ export async function POST(request: NextRequest) {
       const tagCode = `RL-${String(tagNumber).padStart(3, '0')}`
       const publicId = `AUS${String(tagNumber).padStart(4, '0')}`
       
-      console.log(`[FACTORY] Processing tag ${i + 1}/${batchSize}: ${tagCode}`)
+      console.error(`[FACTORY] Processing tag ${i + 1}/${batchSize}: ${tagCode}`)
 
       // Get contract from registry
       const contract = await getDefaultCattleContract()
@@ -212,7 +216,7 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      console.log(`[FACTORY] Tag ${tagCode} created in DB, now minting on-chain...`)
+      console.error(`[FACTORY] Tag ${tagCode} created in DB, now minting on-chain...`)
 
       // 3. Mint NFT on blockchain (MANDATORY - blocking)
       let tokenId: bigint | null = null
@@ -232,14 +236,17 @@ export async function POST(request: NextRequest) {
             color,
             chain,
           })
-          console.log(`[FACTORY] IPFS metadata pinned for ${tagCode}: ${cid}`)
+          console.error(`[FACTORY] IPFS metadata pinned for ${tagCode}: ${cid}`)
         } catch (ipfsError) {
           console.warn(`[FACTORY] IPFS pin failed for ${tagCode}, continuing without CID:`, ipfsError)
           // Continue without CID
         }
 
         // Mint the NFT (MANDATORY)
-        console.log(`[FACTORY] Calling mintTagUnified for ${tagCode}...`)
+        console.error(`[FACTORY] Calling mintTagUnified for ${tagCode}...`)
+        console.error(`[FACTORY] Contract: ${contractAddress}`)
+        console.error(`[FACTORY] Public ID: ${publicId}`)
+        console.error(`[FACTORY] Tag Code: ${tagCode}`)
         const mintResult = await mintTagUnified({
           tagCode,
           publicId,
@@ -250,7 +257,7 @@ export async function POST(request: NextRequest) {
         tokenId = mintResult.tokenId
         mintTxHash = mintResult.txHash
         
-        console.log(`[FACTORY] ✅ Mint successful for ${tagCode}: token_id=${tokenId}, tx=${mintTxHash}`)
+        console.error(`[FACTORY] ✅ Mint successful for ${tagCode}: token_id=${tokenId}, tx=${mintTxHash}`)
 
         // Update contract_address if different from default
         if (mintResult.contractAddress && mintResult.contractAddress !== contractAddress) {
@@ -276,7 +283,7 @@ export async function POST(request: NextRequest) {
           console.error(`[FACTORY] Failed to update tag ${tagCode} after mint:`, updateError)
           mintResults.push({ tagCode, success: false, error: `DB update error: ${updateError.message}` })
         } else {
-          console.log(`[FACTORY] Tag ${tagCode} updated in DB with token_id=${tokenId}`)
+          console.error(`[FACTORY] Tag ${tagCode} updated in DB with token_id=${tokenId}`)
           mintResults.push({ tagCode, success: true, tokenId: tokenId.toString() })
         }
       } catch (error: any) {
@@ -359,7 +366,9 @@ export async function POST(request: NextRequest) {
       .eq('id', batch.id)
 
     const duration = Date.now() - startTime
-    console.log(`[FACTORY] Batch creation completed in ${duration}ms. Success: ${successfulMints}/${batchSize}`)
+    console.error(`[FACTORY] ========================================`)
+    console.error(`[FACTORY] Batch creation completed in ${duration}ms. Success: ${successfulMints}/${batchSize}`)
+    console.error(`[FACTORY] ========================================`)
 
     // 7. Return response
     return NextResponse.json({

@@ -499,113 +499,138 @@ export default function SuperAdminPage() {
                 </div>
               )}
 
-              {devices.length > 0 && (
-                <div id="qr-codes-section" className="mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-lg font-semibold">
-                      {devices.length} tags ready for printing
-                    </span>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => window.print()}
-                        className="btn-secondary"
-                      >
-                        🖨️ Print All
-                      </button>
-                    </div>
-                  </div>
+              {devices.length > 0 && (() => {
+                // CRITICAL: Only show tags that are ON-CHAIN (have token_id) for printing
+                // Tags without token_id should NOT be printed - they're not functional
+                const readyToPrint = devices.filter(d => d.token_id !== null && d.token_id !== undefined)
+                const pendingMint = devices.filter(d => !d.token_id || d.token_id === null)
+                
+                return (
+                  <div id="qr-codes-section" className="mb-6">
+                    {/* Warning for tags that failed mint */}
+                    {pendingMint.length > 0 && (
+                      <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                        <p className="text-yellow-400 font-semibold mb-2">⚠️ {pendingMint.length} tag(s) not ready for printing</p>
+                        <p className="text-yellow-300 text-sm mb-2">
+                          These tags failed to mint and cannot be printed yet. They must be on-chain (have a Token ID) before printing.
+                        </p>
+                        <p className="text-yellow-300 text-sm">
+                          Use the <strong>Retry Mint</strong> button in the Inventory tab to complete the mint, then return here to print.
+                        </p>
+                        <div className="mt-2 text-xs text-yellow-400 font-mono">
+                          Tags: {pendingMint.map(d => d.tag_code).join(', ')}
+                        </div>
+                      </div>
+                    )}
 
-                  {/* QR Codes Grid - Production Sticker Layout */}
-                  <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 print:grid-cols-3">
-                    {devices.map((device) => {
-                      const onChainStatus = getOnChainStatus(device)
-                      return (
-                        <div
-                          key={device.id}
-                          className="border-2 border-white/20 rounded-lg p-4 bg-[var(--bg-card)] print:border-2 print:border-black print:bg-white"
-                        >
-                          {/* Sticker Header - Production Info */}
-                          <div className="text-center mb-4 space-y-2 print:text-left">
-                            <div className="font-mono font-bold text-xl border-b-2 border-[var(--c2)] pb-2">
-                              Tag ID: {device.tag_code || device.tag_id}
-                            </div>
-                            <div className={`text-base font-bold ${device.token_id ? 'text-green-600' : 'text-yellow-600'}`}>
-                              Token ID: {device.token_id ? `#${device.token_id}` : '❌ NOT READY'}
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              Animal ID: {device.public_id || 'Not attached'}
-                            </div>
-                            {device.chain && (
-                              <div className="text-xs text-gray-500 font-semibold">
-                                {device.chain} Mainnet
-                              </div>
-                            )}
-                          </div>
-
-                          {/* QR Code - Points to /t/[tag_code] */}
-                          <div className="mb-4">
-                            <div className="text-xs font-semibold mb-2 text-center bg-gradient-to-r from-[var(--c2)] to-[var(--c3)] text-white px-2 py-1 rounded">
-                              QR Code (30mm × 30mm)
-                            </div>
-                            <div className="bg-white p-2 rounded border-4 border-[var(--c2)] flex justify-center print:border-2 print:border-black">
-                              <QRCodeDisplay url={device.base_qr_url} size={150} />
-                            </div>
-                            <div className="text-xs text-[var(--c4)] mt-2 text-center break-all">
-                              {device.base_qr_url}
-                            </div>
-                          </div>
-
-                          {/* On-chain Status Indicator - Prominent */}
-                          <div className="mt-3 mb-3">
-                            {onChainStatus === 'on-chain' ? (
-                              <div className="text-center">
-                                <div className="inline-block bg-green-900/30 border-2 border-green-600 text-green-300 px-4 py-2 rounded-lg text-sm font-bold">
-                                  ✅ ON-CHAIN
-                                </div>
-                                {device.contract_address && (
-                                  <div className="text-[9px] text-gray-500 mt-1 break-all">
-                                    {device.contract_address.substring(0, 10)}...{device.contract_address.substring(device.contract_address.length - 8)}
-                                  </div>
-                                )}
-                              </div>
-                            ) : onChainStatus === 'off-chain' ? (
-                              <div className="text-center">
-                                <div className="inline-block bg-yellow-900/30 border-2 border-yellow-600 text-yellow-300 px-4 py-2 rounded-lg text-sm font-bold">
-                                  ⚪ OFF-CHAIN
-                                </div>
-                                <div className="text-[9px] text-gray-500 mt-1">
-                                  Mint Pending
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-center">
-                                <div className="inline-block bg-red-900/30 border-2 border-red-600 text-red-300 px-4 py-2 rounded-lg text-sm font-bold">
-                                  🔴 ERROR
-                                </div>
-                                <div className="text-[9px] text-gray-500 mt-1">
-                                  Mint Failed
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Metadata Footer */}
-                          <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-600 mt-2 border-t pt-2">
-                            {device.material && <div><strong>Material:</strong> {device.material}</div>}
-                            {device.model && <div><strong>Model:</strong> {device.model}</div>}
-                            {device.chain && <div><strong>Chain:</strong> {device.chain}</div>}
-                            {device.color && <div><strong>Color:</strong> {device.color}</div>}
-                            {device.batch_name && (
-                              <div className="col-span-2"><strong>Batch:</strong> {device.batch_name}</div>
-                            )}
-                            {device.mint_tx_hash && (
-                              <div className="col-span-2 text-[9px] break-all">
-                                <strong>TX:</strong> {device.mint_tx_hash.substring(0, 20)}...
-                              </div>
-                            )}
+                    {/* Only show printing section if there are tags ready */}
+                    {readyToPrint.length > 0 && (
+                      <>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-lg font-semibold">
+                            {readyToPrint.length} tag(s) ready for printing
+                          </span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => window.print()}
+                              className="btn-secondary"
+                            >
+                              🖨️ Print All ({readyToPrint.length})
+                            </button>
                           </div>
                         </div>
-                      )
+
+                        {/* QR Codes Grid - Production Sticker Layout */}
+                        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 print:grid-cols-3">
+                          {readyToPrint.map((device) => {
+                            const onChainStatus = getOnChainStatus(device)
+                            return (
+                              <div
+                                key={device.id}
+                                className="border-2 border-white/20 rounded-lg p-4 bg-[var(--bg-card)] print:border-2 print:border-black print:bg-white"
+                              >
+                                {/* Sticker Header - Production Info */}
+                                <div className="text-center mb-4 space-y-2 print:text-left">
+                                  <div className="font-mono font-bold text-xl border-b-2 border-[var(--c2)] pb-2">
+                                    Tag ID: {device.tag_code || device.tag_id}
+                                  </div>
+                                  <div className={`text-base font-bold ${device.token_id ? 'text-green-600' : 'text-yellow-600'}`}>
+                                    Token ID: {device.token_id ? `#${device.token_id}` : '❌ NOT READY'}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    Animal ID: {device.public_id || 'Not attached'}
+                                  </div>
+                                  {device.chain && (
+                                    <div className="text-xs text-gray-500 font-semibold">
+                                      {device.chain} Mainnet
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* QR Code - Points to /t/[tag_code] */}
+                                <div className="mb-4">
+                                  <div className="text-xs font-semibold mb-2 text-center bg-gradient-to-r from-[var(--c2)] to-[var(--c3)] text-white px-2 py-1 rounded">
+                                    QR Code (30mm × 30mm)
+                                  </div>
+                                  <div className="bg-white p-2 rounded border-4 border-[var(--c2)] flex justify-center print:border-2 print:border-black">
+                                    <QRCodeDisplay url={device.base_qr_url} size={150} />
+                                  </div>
+                                  <div className="text-xs text-[var(--c4)] mt-2 text-center break-all">
+                                    {device.base_qr_url}
+                                  </div>
+                                </div>
+
+                                {/* On-chain Status Indicator - Prominent */}
+                                <div className="mt-3 mb-3">
+                                  {onChainStatus === 'on-chain' ? (
+                                    <div className="text-center">
+                                      <div className="inline-block bg-green-900/30 border-2 border-green-600 text-green-300 px-4 py-2 rounded-lg text-sm font-bold">
+                                        ✅ ON-CHAIN
+                                      </div>
+                                      {device.contract_address && (
+                                        <div className="text-[9px] text-gray-500 mt-1 break-all">
+                                          {device.contract_address.substring(0, 10)}...{device.contract_address.substring(device.contract_address.length - 8)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : onChainStatus === 'off-chain' ? (
+                                    <div className="text-center">
+                                      <div className="inline-block bg-yellow-900/30 border-2 border-yellow-600 text-yellow-300 px-4 py-2 rounded-lg text-sm font-bold">
+                                        ⚪ OFF-CHAIN
+                                      </div>
+                                      <div className="text-[9px] text-gray-500 mt-1">
+                                        Mint Pending
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center">
+                                      <div className="inline-block bg-red-900/30 border-2 border-red-600 text-red-300 px-4 py-2 rounded-lg text-sm font-bold">
+                                        🔴 ERROR
+                                      </div>
+                                      <div className="text-[9px] text-gray-500 mt-1">
+                                        Mint Failed
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Metadata Footer */}
+                                <div className="grid grid-cols-2 gap-1 text-[10px] text-gray-600 mt-2 border-t pt-2">
+                                  {device.material && <div><strong>Material:</strong> {device.material}</div>}
+                                  {device.model && <div><strong>Model:</strong> {device.model}</div>}
+                                  {device.chain && <div><strong>Chain:</strong> {device.chain}</div>}
+                                  {device.color && <div><strong>Color:</strong> {device.color}</div>}
+                                  {device.batch_name && (
+                                    <div className="col-span-2"><strong>Batch:</strong> {device.batch_name}</div>
+                                  )}
+                                  {device.mint_tx_hash && (
+                                    <div className="col-span-2 text-[9px] break-all">
+                                      <strong>TX:</strong> {device.mint_tx_hash.substring(0, 20)}...
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )
                           })}
                         </div>
                       </>

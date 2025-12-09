@@ -59,6 +59,7 @@ function getContractAddress(): `0x${string}` {
 
 /**
  * Get wallet client for minting (server-side only)
+ * CRITICAL: Must use Base Mainnet (8453) and correct RPC URL
  */
 function getWalletClient() {
   const privateKey = process.env.SERVER_WALLET_PRIVATE_KEY
@@ -69,11 +70,28 @@ function getWalletClient() {
     throw new Error('SERVER_WALLET_PRIVATE_KEY must start with 0x')
   }
 
+  // CRITICAL: Use Base Mainnet (8453) - not testnet
+  // Check if we're explicitly set to mainnet or default to mainnet
+  const chainId = process.env.NEXT_PUBLIC_CHAIN_ID || '8453'
+  const targetChain = chainId === '8453' ? base : baseSepolia
+  
+  // CRITICAL: Use explicit RPC URL - don't rely on chain defaults
+  const rpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC || 
+                 process.env.ALCHEMY_BASE_RPC || 
+                 process.env.ALCHEMY_BASE_MAINNET_RPC ||
+                 'https://mainnet.base.org'
+  
+  console.log('[MINT] Wallet client config:', {
+    chainId: targetChain.id,
+    chainName: targetChain.name,
+    rpcUrl: rpcUrl.substring(0, 30) + '...', // Don't log full URL
+  })
+
   const account = privateKeyToAccount(privateKey as `0x${string}`)
   return createWalletClient({
     account,
-    chain: currentChain,
-    transport: http(),
+    chain: targetChain,
+    transport: http(rpcUrl), // CRITICAL: Use explicit RPC URL
   })
 }
 
