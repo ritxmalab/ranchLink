@@ -149,21 +149,24 @@ export default function SuperAdminPage() {
 
       const data = await response.json()
       
+      // v1.0: Only successfully minted tags are returned in data.tags
+      // Failed tags are NOT included - they're in DB but marked as 'mint_failed'
+      
       // Map response tags to Device format for UI compatibility
       const mappedDevices = data.tags.map((tag: any) => ({
         id: tag.id,
         tag_id: tag.tag_code,
         tag_code: tag.tag_code,
         public_id: tag.public_id || null,
-        token_id: tag.token_id,
+        token_id: tag.token_id, // v1.0: This should ALWAYS exist if tag is in response
         mint_tx_hash: tag.mint_tx_hash,
         base_qr_url: tag.base_qr_url,
         overlay_qr_url: '', // v1.0: DEPRECATED - always empty
         claim_token: '', // v1.0: DEPRECATED - always empty
-        status: tag.status || 'in_inventory',
+        status: tag.status || 'on_chain_unclaimed', // v1.0: Should be 'on_chain_unclaimed' for new tags
         activation_state: tag.activation_state || 'active',
         chain: tag.chain || 'BASE',
-        contract_address: tag.contract_address,
+        contract_address: tag.contract_address, // v1.0: This should ALWAYS exist
         material,
         model,
         color,
@@ -183,23 +186,38 @@ export default function SuperAdminPage() {
       // Set devices immediately so QR codes show up right away
       setDevices(mappedDevices)
       
-      // Refresh from server to get latest data
+      // Refresh from server to get latest data (including any failed tags)
       await fetchDevices()
       
-      const tagsWithTokenId = data.tags.filter((t: any) => t.token_id).length
-      const onChainCount = tagsWithTokenId
-      const pendingCount = data.tags.length - tagsWithTokenId
+      // v1.0: Use mint_summary from API response
+      const successfulMints = data.mint_summary?.successful || 0
+      const failedMints = data.mint_summary?.failed || 0
+      const totalRequested = data.mint_summary?.total || batchSize
       
-      let message = ''
-      if (tagsWithTokenId === data.tags.length) {
-        message = `✅ Successfully generated ${data.tags.length} tags with NFTs minted on Base Mainnet. All tags are on-chain and ready to attach to animals.`
-      } else if (tagsWithTokenId > 0) {
-        message = `⚠️ Generated ${data.tags.length} tags, but ${data.mint_summary?.failed || 0} failed to mint. ${data.mint_summary?.successful || 0} are on-chain and ready to use. Failed tags cannot be attached until minted - use Retry Mint in Inventory.`
-      } else {
-        message = `❌ Generated ${data.tags.length} tags, but all mints failed. Tags are saved but cannot be attached until minted. Check server wallet balance, RPC connection, and MINTER_ROLE. Use Retry Mint in Inventory to complete mints.`
+      // Show message based on API response
+      let message = data.message || ''
+      
+      // If API provided warnings, show them
+      if (data.warnings && data.warnings.length > 0) {
+        message += '\n\n' + data.warnings.join('\n')
+      }
+      
+      // If pre-flight checks failed, show them
+      if (data.preflight_checks) {
+        message += '\n\nPre-flight checks:\n' + data.preflight_checks.join('\n')
+      }
+      
+      // If there are errors, show them
+      if (data.errors && data.errors.length > 0) {
+        message += '\n\nErrors:\n' + data.errors.join('\n')
       }
       
       setMessage(message)
+      
+      // Show error if all mints failed
+      if (failedMints === totalRequested && successfulMints === 0) {
+        setErrorMessage(`All ${totalRequested} tags failed to mint. Check server wallet balance, RPC connection, and MINTER_ROLE. See logs in Vercel for details.`)
+      }
       
       // Scroll to QR codes section after a brief delay
       setTimeout(() => {
