@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     // 1. Get tag from database
     const { data: tag, error: tagError } = await supabase
       .from('tags')
-      .select('id, tag_code, token_id, mint_tx_hash, contract_address, chain, batch_id')
+      .select('id, tag_code, token_id, mint_tx_hash, contract_address, chain, batch_id, animal_id')
       .eq('tag_code', tagCode)
       .single()
 

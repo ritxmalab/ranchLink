@@ -5,7 +5,7 @@
 
 import { createWalletClient, http, parseEther } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { currentChain, publicClient } from './config'
+import { base, baseSepolia, currentChain, publicClient } from './config'
 
 // Contract ABI (minimal - just what we need)
 const RANCHLINK_TAG_ABI = [
