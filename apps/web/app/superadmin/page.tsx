@@ -755,15 +755,37 @@ export default function SuperAdminPage() {
                                 </span>
                                 <button
                                   onClick={async (e) => {
-                                    if (!confirm(`Retry mint for ${device.tag_code}?\n\nThis will attempt to mint the NFT on Base Mainnet.`)) return
-                                    
-                                    // Show loading state
+                                    // First try to sync (check if transaction already completed)
                                     const button = e.currentTarget
                                     const originalText = button.textContent
                                     button.disabled = true
-                                    button.textContent = '⏳ Minting...'
+                                    button.textContent = '🔄 Syncing...'
                                     
                                     try {
+                                      // Try sync first (in case transaction completed but DB wasn't updated)
+                                      const syncResponse = await fetch('/api/sync-tag', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ tagCode: device.tag_code }),
+                                      })
+                                      const syncData = await syncResponse.json()
+                                      
+                                      if (syncData.success && syncData.token_id) {
+                                        // Sync successful - transaction was already completed
+                                        alert(`✅ Tag synced!\n\nToken ID: #${syncData.token_id}\nTransaction: ${syncData.mint_tx_hash}\n\nView on Basescan: ${syncData.basescan_url}`)
+                                        fetchDevices()
+                                        return
+                                      }
+                                      
+                                      // Sync didn't work, try mint
+                                      if (!confirm(`Retry mint for ${device.tag_code}?\n\nThis will attempt to mint the NFT on Base Mainnet.`)) {
+                                        button.disabled = false
+                                        button.textContent = originalText
+                                        return
+                                      }
+                                      
+                                      button.textContent = '⏳ Minting...'
+                                      
                                       const response = await fetch('/api/retry-mint', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },

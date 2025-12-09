@@ -170,13 +170,15 @@ export async function mintTag(
     console.error('[MINT] Waiting for receipt...')
 
     // Wait for transaction receipt with increased timeout (Base can be slow)
-    // Base mainnet typically confirms in 2-3 seconds, but we allow up to 60 seconds
+    // Base mainnet typically confirms in 2-3 seconds, but we allow up to 120 seconds
+    // Also add retry logic for network issues
     let receipt
     try {
       receipt = await publicClient.waitForTransactionReceipt({ 
         hash,
-        timeout: 60000, // 60 seconds timeout
+        timeout: 120000, // 120 seconds timeout (Base can be slow during high traffic)
         confirmations: 1, // Wait for 1 confirmation
+        pollingInterval: 2000, // Check every 2 seconds
       })
       console.error('[MINT] Transaction confirmed:', {
         blockNumber: receipt.blockNumber.toString(),
