@@ -3,6 +3,21 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
 import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
 import { pinAnimalMetadata } from '@/lib/ipfs/client'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+// Schema de validación para prevenir ataques DoS y validar requests
+const batchSchema = z.object({
+  batchName: z.string().min(1).max(100),
+  batchSize: z.number().int().min(1).max(1000),
+  model: z.string().min(1).max(50),
+  material: z.string().min(1).max(50),
+  color: z.string().min(1).max(50),
+  chain: z.string().optional(),
+  targetRanchId: z.string().uuid().optional(),
+  kitMode: z.boolean().optional(),
+  kitSize: z.number().int().optional(),
+})
 
 /**
  * POST /api/factory/batches
@@ -31,8 +46,33 @@ export async function POST(request: NextRequest) {
   console.error('[FACTORY] Starting batch creation...')
   console.error('[FACTORY] ========================================')
   
+  // Rate limiting - prevent DoS attacks (CVE-2025-55184)
+  if (!rateLimit(request, 5, 60000)) {
+    console.error('[FACTORY] Rate limit exceeded')
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+  
   try {
     const body = await request.json()
+    
+    // Validación estricta con Zod - previene ataques y valida tipos
+    let validated
+    try {
+      validated = batchSchema.parse(body)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        console.error('[FACTORY] Validation error:', error.errors)
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 }
+        )
+      }
+      throw error
+    }
+    
     const {
       batchName,
       batchSize,
@@ -43,15 +83,7 @@ export async function POST(request: NextRequest) {
       targetRanchId,
       kitMode = false,
       kitSize,
-    } = body
-
-    // Validation
-    if (!batchName || !batchSize || !model || !material || !color) {
-      return NextResponse.json(
-        { error: 'Missing required fields: batchName, batchSize, model, material, color' },
-        { status: 400 }
-      )
-    }
+    } = validated
 
     if (batchSize < 1 || batchSize > 1000) {
       return NextResponse.json(

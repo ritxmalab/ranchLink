@@ -68,12 +68,13 @@ export async function POST(request: NextRequest) {
     for (const log of receipt.logs) {
       if (log.address.toLowerCase() === contractAddress.toLowerCase()) {
         try {
-          const decoded = publicClient.decodeEventLog({
+          const { decodeEventLog } = await import('viem')
+          const decoded = decodeEventLog({
             abi: RANCHLINK_TAG_ABI,
             data: log.data,
             topics: log.topics,
           })
-          if (decoded.eventName === 'TagMinted') {
+          if (decoded.eventName === 'TagMinted' && decoded.args && 'tokenId' in decoded.args) {
             tokenId = decoded.args.tokenId as bigint
             break
           }

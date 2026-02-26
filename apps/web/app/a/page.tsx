@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 
@@ -36,7 +36,7 @@ interface Event {
   created_at: string
 }
 
-export default function AnimalCardPage() {
+function AnimalCardContent() {
   const searchParams = useSearchParams()
   const publicId = searchParams.get('id') || 'AUS0001'
   const [animal, setAnimal] = useState<Animal | null>(null)
@@ -254,6 +254,21 @@ export default function AnimalCardPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function AnimalCardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--c2)] mx-auto mb-4"></div>
+          <p className="text-[var(--c4)]">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AnimalCardContent />
+    </Suspense>
   )
 }
 

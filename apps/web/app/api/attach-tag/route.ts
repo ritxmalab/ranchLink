@@ -1,37 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+const attachTagSchema = z.object({
+  tagCode: z.string().min(1).max(20),
+  animalData: z.object({
+    // BASIC
+    name: z.string().min(1).max(100),
+    species: z.string().min(1).max(50),
+    breed: z.string().max(100).optional(),
+    birth_year: z.number().int().min(1900).max(2100).optional(),
+    sex: z.string().max(20).optional(),
+    size: z.string().max(50).optional(),
+
+    // IDENTIFICATION
+    eid: z.string().max(100).optional(),
+    secondary_id: z.string().max(100).optional(),
+    tattoo: z.string().max(100).optional(),
+    brand: z.string().max(100).optional(),
+
+    // ADDITIONAL
+    owner: z.string().max(200).optional(),
+    head_count: z.number().int().min(1).optional(),
+    labels: z.array(z.string().max(50)).optional(),
+
+    // CALLFHOOD
+    dam_id: z.string().max(100).optional(),
+    sire_id: z.string().max(100).optional(),
+    birth_weight: z.number().optional(),
+    weaning_weight: z.number().optional(),
+    weaning_date: z.string().optional(),
+    yearling_weight: z.number().optional(),
+    yearling_date: z.string().optional(),
+
+    // PURCHASE
+    seller: z.string().max(200).optional(),
+    purchase_price: z.number().optional(),
+    purchase_date: z.string().optional(),
+  }),
+})
 
 /**
  * POST /api/attach-tag
- * Attaches a tag to an animal (v1.0)
+ * Attaches a tag to an animal — fills all field sections from the RanchLink diagram.
  * 
- * Request body:
- * {
- *   tagCode: string,
- *   animalData: {
- *     name: string,
- *     species: string,
- *     breed?: string,
- *     birth_year?: number,
- *     sex?: string
- *   }
- * }
+ * Pipeline: QR scan → /t/[tag_code] → this endpoint → /a/[public_id]
+ * The NFT was already minted during batch creation. This only:
+ *   1. Creates the animal record with all fields
+ *   2. Links tag to animal
+ *   3. Pins full metadata to IPFS
+ *   4. Calls setCID() to update NFT tokenURI on-chain
  */
 export async function POST(request: NextRequest) {
+  if (!rateLimit(request, 10, 60000)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
   try {
     const body = await request.json()
-    const { tagCode, animalData } = body
 
-    if (!tagCode || !animalData || !animalData.name || !animalData.species) {
-      return NextResponse.json(
-        { error: 'Missing required fields: tagCode, animalData.name, animalData.species' },
-        { status: 400 }
-      )
+    let validated
+    try {
+      validated = attachTagSchema.parse(body)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 }
+        )
+      }
+      throw error
     }
 
+    const { tagCode, animalData } = validated
     const supabase = getSupabaseServerClient()
 
-    // 1. Load tag from tags table (v1.0: tag MUST be on-chain before attach)
+    // 1. Load tag — must exist and be on-chain
     const { data: tag, error: tagError } = await supabase
       .from('tags')
       .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash')
@@ -39,13 +87,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (tagError || !tag) {
-      return NextResponse.json(
-        { error: 'Tag not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }
 
-    // 2. Verify tag is on-chain (v1.0 requirement: mint must complete before attach)
+    // 2. Tag MUST be on-chain before attach (v1.0 rule)
     if (!tag.token_id || !tag.contract_address) {
       return NextResponse.json(
         {
@@ -61,52 +106,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 3. Verify authentication and ownership
-    // TODO: Implement Supabase Auth check
-    // For now, allow if tag.ranch_id is null or if user's ranch_id matches
-    // const { data: { user } } = await supabase.auth.getUser()
-    // if (!user) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
-    // const userRanchId = user.user_metadata?.ranch_id
-    // if (tag.ranch_id && tag.ranch_id !== userRanchId) {
-    //   return NextResponse.json({ error: 'Not authorized to attach this tag' }, { status: 403 })
-    // }
-
-    // For v1.0, we'll allow attachment if tag.ranch_id is null or if explicitly allowed
-    // In production, implement proper auth check above
+    // 3. Build the full animal payload
+    const animalPayload = {
+      name: animalData.name,
+      species: animalData.species,
+      breed: animalData.breed || null,
+      birth_year: animalData.birth_year || null,
+      sex: animalData.sex || null,
+      size: animalData.size || null,
+      // IDENTIFICATION
+      eid: animalData.eid || null,
+      secondary_id: animalData.secondary_id || null,
+      tattoo: animalData.tattoo || null,
+      brand: animalData.brand || null,
+      // ADDITIONAL
+      owner: animalData.owner || null,
+      head_count: animalData.head_count || null,
+      labels: animalData.labels || null,
+      // CALLFHOOD
+      dam_id: animalData.dam_id || null,
+      sire_id: animalData.sire_id || null,
+      birth_weight: animalData.birth_weight || null,
+      weaning_weight: animalData.weaning_weight || null,
+      weaning_date: animalData.weaning_date || null,
+      yearling_weight: animalData.yearling_weight || null,
+      yearling_date: animalData.yearling_date || null,
+      // PURCHASE
+      seller: animalData.seller || null,
+      purchase_price: animalData.purchase_price || null,
+      purchase_date: animalData.purchase_date || null,
+    }
 
     // 4. Create or update animal
     let animalId: string
     let publicId: string
 
     if (tag.animal_id) {
-      // Update existing animal
       const { data: existingAnimal, error: animalError } = await supabase
         .from('animals')
-        .update({
-          name: animalData.name,
-          species: animalData.species,
-          breed: animalData.breed || null,
-          birth_year: animalData.birth_year || null,
-          sex: animalData.sex || null,
-        })
+        .update(animalPayload)
         .eq('id', tag.animal_id)
         .select('public_id')
         .single()
 
       if (animalError || !existingAnimal) {
-        return NextResponse.json(
-          { error: 'Failed to update animal' },
-          { status: 500 }
-        )
+        return NextResponse.json({ error: 'Failed to update animal' }, { status: 500 })
       }
 
       animalId = tag.animal_id
       publicId = existingAnimal.public_id
     } else {
-      // Create new animal
-      // Generate public_id
       const { data: lastAnimal } = await supabase
         .from('animals')
         .select('public_id')
@@ -116,67 +165,97 @@ export async function POST(request: NextRequest) {
       let nextNumber = 1
       if (lastAnimal && lastAnimal.length > 0) {
         const match = lastAnimal[0].public_id?.match(/AUS(\d+)/)
-        if (match) {
-          nextNumber = parseInt(match[1], 10) + 1
-        }
+        if (match) nextNumber = parseInt(match[1], 10) + 1
       }
 
       publicId = `AUS${String(nextNumber).padStart(4, '0')}`
-
-      // Determine ranch_id
-      // TODO: Get from authenticated user's ranch_id
-      // For now, use tag.ranch_id if exists, or null
       const ranchId = tag.ranch_id || null
 
       const { data: newAnimal, error: animalError } = await supabase
         .from('animals')
         .insert({
           public_id: publicId,
-          name: animalData.name,
-          species: animalData.species,
-          breed: animalData.breed || null,
-          birth_year: animalData.birth_year || null,
-          sex: animalData.sex || null,
           ranch_id: ranchId,
           status: 'active',
+          ...animalPayload,
         })
         .select('id, public_id')
         .single()
 
       if (animalError || !newAnimal) {
-        return NextResponse.json(
-          { error: 'Failed to create animal' },
-          { status: 500 }
-        )
+        console.error('[ATTACH-TAG] Failed to create animal:', animalError)
+        return NextResponse.json({ error: 'Failed to create animal' }, { status: 500 })
       }
 
       animalId = newAnimal.id
       publicId = newAnimal.public_id
     }
 
-    // 5. Update tag
+    // 5. Link tag to animal
     const { error: updateError } = await supabase
       .from('tags')
       .update({
         animal_id: animalId,
-        ranch_id: tag.ranch_id || null, // Keep existing or set from animal
+        ranch_id: tag.ranch_id || null,
         status: 'attached',
       })
       .eq('id', tag.id)
 
     if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to update tag' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 })
     }
 
-    // 5. Return success
+    // 6. Pin complete metadata to IPFS and update NFT tokenURI on-chain
+    let metadataCid: string | null = null
+    let metadataTxHash: string | null = null
+
+    try {
+      let ranchData = null
+      if (tag.ranch_id) {
+        const { data: ranch } = await supabase
+          .from('ranches')
+          .select('name, contact_email, phone')
+          .eq('id', tag.ranch_id)
+          .single()
+        ranchData = ranch
+      }
+
+      const { data: completeAnimal } = await supabase
+        .from('animals')
+        .select('*, tags!inner(tag_code)')
+        .eq('id', animalId)
+        .single()
+
+      if (completeAnimal && tag.token_id) {
+        const { pinAnimalMetadata } = await import('@/lib/ipfs/client')
+        metadataCid = await pinAnimalMetadata(completeAnimal, ranchData)
+        console.log(`[ATTACH-TAG] Metadata pinned to IPFS: ${metadataCid}`)
+
+        const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
+        const tokenId = BigInt(tag.token_id)
+        metadataTxHash = await setCID(tokenId, metadataCid)
+        console.log(`[ATTACH-TAG] TokenURI updated on-chain: ${metadataTxHash}`)
+
+        await supabase
+          .from('tags')
+          .update({
+            metadata_cid: metadataCid,
+            metadata_tx_hash: metadataTxHash,
+          })
+          .eq('id', tag.id)
+      }
+    } catch (error: any) {
+      console.error('[ATTACH-TAG] Failed to update metadata (non-blocking):', error)
+    }
+
     return NextResponse.json({
       success: true,
       public_id: publicId,
       tag_code: tagCode,
       message: 'Tag attached successfully',
+      metadata_updated: !!metadataCid,
+      metadata_cid: metadataCid,
+      metadata_tx_hash: metadataTxHash,
     })
   } catch (error: any) {
     console.error('Attach tag error:', error)
@@ -189,4 +268,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

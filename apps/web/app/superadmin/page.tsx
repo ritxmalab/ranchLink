@@ -228,11 +228,23 @@ export default function SuperAdminPage() {
       }, 300)
     } catch (error: any) {
       console.error('Generate error:', error)
-      if (error.message?.includes('fetch failed') || error.message?.includes('Network')) {
-        setErrorMessage('Network error: Could not connect to server. Check environment variables in Vercel.')
-      } else {
-        setErrorMessage(error.message || 'Failed to generate batch')
+      let errorMsg = error.message || 'Failed to generate batch'
+      
+      // Detailed error handling for fetch failures
+      if (error.message?.includes('fetch failed') || error.message?.includes('Network') || error.name === 'TypeError') {
+        errorMsg = `Network error: Could not connect to server.\n\n` +
+          `Possible causes:\n` +
+          `1. API endpoint not deployed: /api/factory/batches\n` +
+          `2. Missing environment variables in Vercel\n` +
+          `3. Server timeout or crash\n\n` +
+          `Check:\n` +
+          `- Vercel deployment status\n` +
+          `- Environment variables (SERVER_WALLET_PRIVATE_KEY, RANCHLINKTAG_ADDRESS, etc.)\n` +
+          `- Vercel logs for errors\n\n` +
+          `Try: https://ranch-link.vercel.app/api/health`
       }
+      
+      setErrorMessage(errorMsg)
     } finally {
       setIsSaving(false)
     }

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { createPublicClient, http } from 'viem'
 import { base } from '@/lib/blockchain/config'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+// Schema de validación
+const syncTagSchema = z.object({
+  tagCode: z.string().min(1).max(20),
+})
 
 /**
  * POST /api/sync-tag
@@ -9,12 +16,32 @@ import { base } from '@/lib/blockchain/config'
  * This fixes cases where the transaction completed but the DB wasn't updated
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting - prevent DoS attacks (CVE-2025-55184)
+  if (!rateLimit(request, 10, 60000)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+  
   try {
-    const { tagCode } = await request.json()
-
-    if (!tagCode) {
-      return NextResponse.json({ error: 'tagCode is required' }, { status: 400 })
+    const body = await request.json()
+    
+    // Validación estricta con Zod
+    let validated
+    try {
+      validated = syncTagSchema.parse(body)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 }
+        )
+      }
+      throw error
     }
+    
+    const { tagCode } = validated
 
     const supabase = getSupabaseServerClient()
 

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
 import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+// Schema de validación
+const retryMintSchema = z.object({
+  tagCode: z.string().min(1).max(20),
+})
 
 /**
  * POST /api/retry-mint
@@ -13,16 +20,32 @@ import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
  * }
  */
 export async function POST(request: NextRequest) {
+  // Rate limiting - prevent DoS attacks (CVE-2025-55184)
+  if (!rateLimit(request, 5, 60000)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+  
   try {
     const body = await request.json()
-    const { tagCode } = body
-
-    if (!tagCode) {
-      return NextResponse.json(
-        { error: 'tagCode is required' },
-        { status: 400 }
-      )
+    
+    // Validación estricta con Zod
+    let validated
+    try {
+      validated = retryMintSchema.parse(body)
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          { error: 'Invalid request body', details: error.errors },
+          { status: 400 }
+        )
+      }
+      throw error
     }
+    
+    const { tagCode } = validated
 
     const supabase = getSupabaseServerClient()
 

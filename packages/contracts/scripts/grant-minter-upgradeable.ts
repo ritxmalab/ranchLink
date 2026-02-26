@@ -13,8 +13,9 @@ dotenv.config({ path: path.resolve(__dirname, '../../apps/web/.env.local') });
  *   npx hardhat run scripts/grant-minter-upgradeable.ts --network base
  */
 async function main() {
-  const CONTRACT_ADDRESS = process.env.RANCHLINKTAG_ADDRESS;
-  const SERVER_WALLET = process.env.SERVER_WALLET_ADDRESS;
+  const CONTRACT_ADDRESS = process.env.RANCHLINKTAG_ADDRESS || '0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242';
+  // Use new EOA wallet instead of compromised smart wallet
+  const SERVER_WALLET = process.env.SERVER_WALLET_ADDRESS || '0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4';
 
   if (!CONTRACT_ADDRESS) {
     throw new Error("RANCHLINKTAG_ADDRESS must be set in environment variables");

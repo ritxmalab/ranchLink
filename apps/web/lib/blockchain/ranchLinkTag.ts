@@ -41,6 +41,16 @@ const RANCHLINK_TAG_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'cid', type: 'string' },
+    ],
+    name: 'setCID',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
 ] as const
 
 /**
@@ -295,6 +305,54 @@ export async function getTokenURI(tokenId: bigint): Promise<string> {
     return uri
   } catch (error: any) {
     throw new Error(`Failed to get token URI: ${error.message}`)
+  }
+}
+
+/**
+ * Update token URI (CID) for an existing NFT
+ * This allows updating metadata after animal is attached
+ * @param tokenId - Token ID
+ * @param cid - New IPFS CID (without ipfs:// prefix)
+ * @returns Transaction hash
+ */
+export async function setCID(tokenId: bigint, cid: string): Promise<`0x${string}`> {
+  const contractAddress = getContractAddress()
+  const serverWalletPrivateKey = process.env.SERVER_WALLET_PRIVATE_KEY
+  
+  if (!serverWalletPrivateKey) {
+    throw new Error('Missing SERVER_WALLET_PRIVATE_KEY environment variable')
+  }
+
+  const walletClient = getWalletClient()
+
+  try {
+    console.log(`[SET-CID] Updating tokenURI for tokenId ${tokenId} with CID: ${cid}`)
+    
+    const hash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: RANCHLINK_TAG_ABI,
+      functionName: 'setCID',
+      args: [tokenId, cid],
+    })
+
+    console.log(`[SET-CID] Transaction submitted: ${hash}`)
+
+    // Wait for transaction receipt
+    const receipt = await publicClient.waitForTransactionReceipt({ 
+      hash,
+      timeout: 120000,
+      confirmations: 1,
+    })
+
+    if (receipt.status === 'reverted') {
+      throw new Error('Transaction reverted')
+    }
+
+    console.log(`[SET-CID] ✅ TokenURI updated successfully. Block: ${receipt.blockNumber}`)
+    return hash
+  } catch (error: any) {
+    console.error(`[SET-CID] ❌ Failed to update CID:`, error)
+    throw new Error(`Failed to update CID: ${error.message}`)
   }
 }
 
