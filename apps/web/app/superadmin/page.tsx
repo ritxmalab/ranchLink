@@ -257,32 +257,6 @@ export default function SuperAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null)
   const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory'>('factory')
 
-  // Check if already authenticated via cookie
-  useEffect(() => {
-    fetch('/api/superadmin/devices', { method: 'HEAD' })
-      .then(r => {
-        // If we can reach the endpoint, we're in (no strict auth on API yet)
-        // Check cookie via a dedicated endpoint
-        return fetch('/api/superadmin/login', { method: 'GET' }).then(r2 => {
-          setAuthed(true) // optimistic — login form will catch wrong passwords
-        })
-      })
-      .catch(() => setAuthed(false))
-    
-    // Check cookie presence
-    const hasCookie = document.cookie.includes('rl_superadmin')
-    setAuthed(hasCookie)
-  }, [])
-
-  if (authed === null) {
-    return <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c2)]" />
-    </div>
-  }
-
-  if (!authed) {
-    return <SuperadminLogin onAuth={() => setAuthed(true)} />
-  }
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [batches, setBatches] = useState<Batch[]>([])
@@ -290,7 +264,6 @@ export default function SuperAdminPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  // Removed qrPreview - v1.0 doesn't use overlay QR
 
   // Factory form state
   const [batchSize, setBatchSize] = useState(3)
@@ -309,7 +282,7 @@ export default function SuperAdminPage() {
     created_at: string
   } | null>(null)
 
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     setIsLoadingDevices(true)
     setErrorMessage(null)
     try {
@@ -325,12 +298,28 @@ export default function SuperAdminPage() {
     } finally {
       setIsLoadingDevices(false)
     }
+  }, [])
+
+  // Check cookie auth on mount
+  useEffect(() => {
+    const hasCookie = document.cookie.includes('rl_superadmin')
+    setAuthed(hasCookie)
+  }, [])
+
+  // Fetch devices only after authenticated
+  useEffect(() => {
+    if (authed) fetchDevices()
+  }, [authed, fetchDevices])
+
+  if (authed === null) {
+    return <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c2)]" />
+    </div>
   }
 
-  useEffect(() => {
-    fetchDevices()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  if (!authed) {
+    return <SuperadminLogin onAuth={() => setAuthed(true)} />
+  }
 
   const handleGenerate = async () => {
     setIsSaving(true)
