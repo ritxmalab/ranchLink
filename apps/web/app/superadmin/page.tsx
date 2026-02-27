@@ -1067,6 +1067,42 @@ export default function SuperAdminPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* QR Print Section — on-chain tags only */}
+              {(() => {
+                const printable = devices.filter(d => d.token_id)
+                if (printable.length === 0) return null
+                return (
+                  <div className="mt-8 border-t border-white/10 pt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold">🖨️ QR Codes — Ready to Print ({printable.length})</h3>
+                      <button onClick={() => window.print()} className="btn-secondary">
+                        🖨️ Print All ({printable.length})
+                      </button>
+                    </div>
+                    <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4 print:grid-cols-3">
+                      {printable.map((device) => (
+                        <div key={device.id} className="border-2 border-white/20 rounded-lg p-3 bg-[var(--bg-card)] print:border-2 print:border-black print:bg-white">
+                          <div className="text-center mb-2">
+                            <div className="font-mono font-bold text-base border-b border-[var(--c2)] pb-1 mb-1">
+                              {device.tag_code}
+                            </div>
+                            <div className="text-green-400 text-xs font-semibold">Token #{device.token_id}</div>
+                            {device.public_id && <div className="text-xs text-[var(--c4)]">{device.public_id}</div>}
+                          </div>
+                          <div className="bg-white p-2 rounded flex justify-center">
+                            <QRCodeDisplay url={device.base_qr_url} size={130} />
+                          </div>
+                          <div className="text-[10px] text-[var(--c4)] mt-1 text-center break-all">{device.base_qr_url}</div>
+                          {device.batch_name && (
+                            <div className="text-[10px] text-[var(--c4)] text-center mt-1">Batch: {device.batch_name}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             )}
           </div>
         )}

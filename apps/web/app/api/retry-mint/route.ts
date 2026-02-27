@@ -147,13 +147,11 @@ export async function POST(request: NextRequest) {
       const balanceEth = formatEther(balance)
       checks.push(`✓ Server wallet balance: ${balanceEth} ETH`)
       
-      // Base mainnet gas is very cheap (~$0.01-0.05 per mint)
-      // Minimum balance: 0.0001 ETH should be enough for 1-2 mints
-      if (parseFloat(balanceEth) < 0.0001) {
-        errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.0001 ETH for gas)`)
-      } else if (parseFloat(balanceEth) < 0.001) {
-        // Warn but don't block if balance is low but above minimum
-        checks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.001+ ETH for multiple mints)`)
+      // Base mainnet gas is very cheap (~$0.000005-0.00002 ETH per mint)
+      if (parseFloat(balanceEth) < 0.00001) {
+        errors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.00001 ETH for gas)`)
+      } else if (parseFloat(balanceEth) < 0.0001) {
+        checks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.0001+ ETH for multiple mints)`)
       }
     } catch (balanceError: any) {
       console.warn('Could not check wallet balance:', balanceError.message)
@@ -220,12 +218,14 @@ export async function POST(request: NextRequest) {
           .eq('id', tag.id)
       }
 
-      // Update tag with token ID and transaction hash
+      // Update tag with token ID, transaction hash, and correct status
       const { error: updateError } = await supabase
         .from('tags')
         .update({
           token_id: tokenId ? tokenId.toString() : null,
           mint_tx_hash: mintTxHash,
+          contract_address: contractAddress,
+          status: 'on_chain_unclaimed',
         })
         .eq('id', tag.id)
 
