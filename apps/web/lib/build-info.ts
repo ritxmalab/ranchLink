@@ -8,7 +8,7 @@ export const BUILD_COMMIT = process.env.NEXT_PUBLIC_BUILD_COMMIT || process.env.
 export const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString()
 export const VERSION = '1.0.0'
 
-export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_TAG || process.env.RANCHLINKTAG_ADDRESS || '0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242'
+export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_TAG || process.env.RANCHLINKTAG_ADDRESS || '0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B'
 
 export function getBuildInfo() {
   return {

@@ -365,7 +365,7 @@ export function getBasescanUrl(tokenId: bigint): string {
   const contractAddress =
     process.env.RANCHLINKTAG_ADDRESS ||
     process.env.NEXT_PUBLIC_CONTRACT_TAG ||
-    '0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242'
+    '0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B'
   const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '8453', 10)
   const baseUrl = chainId === 8453
     ? 'https://basescan.org'
