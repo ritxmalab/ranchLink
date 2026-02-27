@@ -119,7 +119,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ devices: (data || []).map(mapDevice) })
+    return NextResponse.json({ devices: data || [] })
   } catch (err: any) {
     return NextResponse.json({ 
       error: err.message || 'Failed to fetch devices',

@@ -58,12 +58,16 @@ export async function POST(request: NextRequest) {
 
     // 2. If tag already has token_id, return success
     if (tag.token_id) {
+      const contractAddress = tag.contract_address || process.env.RANCHLINKTAG_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_TAG || ''
       return NextResponse.json({
         success: true,
         message: 'Tag already synced',
         tag_code: tag.tag_code,
         token_id: tag.token_id,
         mint_tx_hash: tag.mint_tx_hash,
+        basescan_url: contractAddress
+          ? `https://basescan.org/token/${contractAddress}?a=${tag.token_id}`
+          : `https://basescan.org/tx/${tag.mint_tx_hash}`,
       })
     }
 
@@ -84,30 +88,41 @@ export async function POST(request: NextRequest) {
         })
 
         if (receipt && receipt.status === 'success') {
-          // Transaction succeeded, now get the token ID
-          // We need to parse the logs or call getTokenId
-          // For now, let's try to get it from the public_id
-          const publicId = `AUS${tag.tag_code.replace('RL-', '').padStart(4, '0')}`
+          // Extract token ID from TagMinted event logs (avoids stale RPC state)
+          const TAG_MINTED_TOPIC = '0xe304d243bce9c0e0ff7a391d3c7beee122d63493c415508e44ecdd13491900c9'
+          let tokenId: bigint = BigInt(0)
           
-          // Hash the public ID
-          const { keccak256, stringToBytes } = await import('viem')
-          const publicIdHash = keccak256(stringToBytes(publicId))
+          for (const log of receipt.logs) {
+            if (
+              log.address.toLowerCase() === contractAddress.toLowerCase() &&
+              log.topics[0] === TAG_MINTED_TOPIC &&
+              log.topics[1]
+            ) {
+              tokenId = BigInt(log.topics[1] as string)
+              break
+            }
+          }
 
-          // Get token ID from contract
-          const tokenId = await publicClient.readContract({
-            address: contractAddress,
-            abi: [
-              {
-                inputs: [{ name: 'publicIdHash', type: 'bytes32' }],
-                name: 'getTokenId',
-                outputs: [{ name: '', type: 'uint256' }],
-                stateMutability: 'view',
-                type: 'function',
-              },
-            ],
-            functionName: 'getTokenId',
-            args: [publicIdHash],
-          }) as bigint
+          // Fallback: use getTokenId if log parsing didn't work
+          if (!tokenId || tokenId === BigInt(0)) {
+            const publicId = `AUS${tag.tag_code.replace('RL-', '').padStart(4, '0')}`
+            const { keccak256, stringToBytes } = await import('viem')
+            const publicIdHash = keccak256(stringToBytes(publicId))
+            tokenId = await publicClient.readContract({
+              address: contractAddress,
+              abi: [
+                {
+                  inputs: [{ name: 'publicIdHash', type: 'bytes32' }],
+                  name: 'getTokenId',
+                  outputs: [{ name: '', type: 'uint256' }],
+                  stateMutability: 'view',
+                  type: 'function',
+                },
+              ],
+              functionName: 'getTokenId',
+              args: [publicIdHash],
+            }) as bigint
+          }
 
           if (tokenId && tokenId > BigInt(0)) {
             // Update database
