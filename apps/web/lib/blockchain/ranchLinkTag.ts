@@ -51,6 +51,18 @@ const RANCHLINK_TAG_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  // TagMinted event — used to extract tokenId from receipt logs
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: 'tokenId', type: 'uint256' },
+      { indexed: true, name: 'publicIdHash', type: 'bytes32' },
+      { indexed: false, name: 'to', type: 'address' },
+      { indexed: false, name: 'cid', type: 'string' },
+    ],
+    name: 'TagMinted',
+    type: 'event',
+  },
 ] as const
 
 /**
@@ -227,17 +239,42 @@ export async function mintTag(
       throw new Error(`Transaction reverted. Hash: ${hash}`)
     }
 
-    // Get token ID using the contract's getTokenId function
-    // This is more reliable than parsing events
-    console.error('[MINT] Fetching token ID...')
-    const tokenId = await publicClient.readContract({
-      address: contractAddress,
-      abi: RANCHLINK_TAG_ABI,
-      functionName: 'getTokenId',
-      args: [publicIdHash],
-    }) as bigint
+    // Extract token ID from TagMinted event in receipt logs
+    // This is more reliable than a separate getTokenId() call which can read stale state
+    console.error('[MINT] Extracting token ID from receipt logs...')
+    let tokenId: bigint = BigInt(0)
 
-    console.error('[MINT] Token ID retrieved:', tokenId.toString())
+    // TagMinted event signature: keccak256("TagMinted(uint256,bytes32,address,string)")
+    const TAG_MINTED_TOPIC = '0xe304d243bce9c0e0ff7a391d3c7beee122d63493c415508e44ecdd13491900c9'
+    for (const log of receipt.logs) {
+      if (
+        log.address.toLowerCase() === contractAddress.toLowerCase() &&
+        log.topics[0] === TAG_MINTED_TOPIC
+      ) {
+        // topics[1] is tokenId (indexed uint256)
+        tokenId = BigInt(log.topics[1] as string)
+        console.error('[MINT] Token ID from event log:', tokenId.toString())
+        break
+      }
+    }
+
+    // Fallback: if log parsing failed, try getTokenId with retry
+    if (!tokenId || tokenId === BigInt(0)) {
+      console.error('[MINT] Log parsing failed, trying getTokenId with retry...')
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise(r => setTimeout(r, 2000)) // wait 2s for RPC to catch up
+        tokenId = await publicClient.readContract({
+          address: contractAddress,
+          abi: RANCHLINK_TAG_ABI,
+          functionName: 'getTokenId',
+          args: [publicIdHash],
+        }) as bigint
+        if (tokenId && tokenId > BigInt(0)) break
+        console.error(`[MINT] getTokenId attempt ${attempt + 1} returned 0, retrying...`)
+      }
+    }
+
+    console.error('[MINT] Token ID resolved:', tokenId.toString())
 
     if (!tokenId || tokenId === BigInt(0)) {
       throw new Error(`Failed to get token ID after minting. Transaction hash: ${hash}`)
