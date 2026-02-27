@@ -1,107 +1,227 @@
 ---
-description: RanchLink system architecture, pipeline, and field definitions. Always apply.
+description: RanchLink system architecture, full current state, pipeline, field definitions. Always apply.
 alwaysApply: true
 ---
 
-# RanchLink System Architecture
+# RanchLink — Persistent System State
+**Last updated:** 2026-02-27  
+**Deployment:** https://ranch-link.vercel.app  
+**GitHub:** https://github.com/ritxmalab/ranchLink  
+**Supabase project:** utovzxpmfnzihurotqnv  
+**Vercel project:** ritxma-integrations-projects/ranch-link (id: prj_NxhdtgXobdqmE07duN86PnK8BeQ5)
+
+---
+
+## Key Technical Constants (NEVER change these without confirmation)
+
+| Item | Value |
+|---|---|
+| Chain | Base Mainnet (chainId: 8453) |
+| Contract | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` (RanchLinkTag ERC-721) |
+| Server Wallet | `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` (has MINTER_ROLE) |
+| IPFS | Pinata (PINATA_JWT in .env.local and Vercel) |
+| DB | Supabase — tables: tags, animals, ranches, batches, animal_events |
+| QR URL pattern | `https://ranch-link.vercel.app/t/[tag_code]` |
+| Animal card URL | `/a/[public_id]` (format: AUS0001, AUS0002...) |
+| Tag code format | RL-001, RL-002... |
+| Superadmin URL | `/superadmin` — password via SUPERADMIN_PASSWORD env var |
+| Superadmin password | `ranchlink2026` (set in Vercel env) |
+
+---
 
 ## Core Pipeline (NEVER deviate from this)
 
 ```
-Server Wallet (0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83) orchestrates everything.
+Server Wallet orchestrates everything.
 
-1. SUPER ADMIN → Factory
-   - Creates batch in /superadmin (Factory tab)
+1. SUPER ADMIN → Factory (/superadmin → Factory tab)
    - POST /api/factory/batches
    - Mints NFT IMMEDIATELY per tag → server wallet holds NFT
+   - Pins initial IPFS metadata via Pinata
    - Generates: Batch ID, tag_code (RL-XXX), token_id, QR URL
    - Status after: on_chain_unclaimed
+   ✅ FULLY BUILT
 
-2. SUPER ADMIN → Assemble
-   - Matches crypto-native label (QR) to physical medium tag
-   - Ships physical tag to rancher
+2. SUPER ADMIN → Assemble (/superadmin → Assemble tab)
+   - Shows on_chain_unclaimed tags
+   - Mark as assembled (assembled_at timestamp) then shipped (shipped_at)
+   - POST /api/superadmin/assemble
+   - Status flow: on_chain_unclaimed → assembled → shipped
+   ✅ FULLY BUILT
 
-3. SUPER ADMIN → Inventory
-   - Stores tokenized tags (real world → virtual blockchain world)
-   - View/manage all tags, retry failed mints
+3. SUPER ADMIN → Inventory (/superadmin → Inventory tab)
+   - View all tags, retry failed mints
+   - Retry Mint + Sync buttons per tag
+   ✅ FULLY BUILT
 
-4. USER → Claim
-   - Rancher purchases/receives physical cattle tag
-   - Scans QR → /t/[tag_code]
-   - Creates user account if rancher doesn't have one
-   - User creation gives them a designated CUSTODIAL WALLET to hold the NFT/RWA
-   - NO second mint happens here — NFT already exists
+4. USER → Claim/Scan
+   - Rancher scans QR → /t/[tag_code]
+   - If already attached: redirects to /a/[public_id]
+   - If not attached: shows attach form
+   ⚠️ PARTIALLY BUILT — no user account creation, no custodial wallet assignment
 
 5. USER → Attach (ADD/FILL UP asset info)
    - POST /api/attach-tag
-   - Creates animal record in DB with ALL field sections (see below)
+   - Photo upload: /api/upload-photo → Pinata Files API → photo_url in DB
+   - Creates animal record with ALL field sections
    - Pins complete metadata to IPFS (Pinata)
    - Calls setCID() to update NFT tokenURI on-chain
-   - Status after: attached
-   - Redirects to /a/[public_id]
+   - Status after: attached → redirects to /a/[public_id]
+   ✅ FULLY BUILT
 
-6. USER → Ongoing Updates
-   - Smart contract allows metadata updates via setCID()
-   - Push new data: weight, health, vet visits, state monitoring
-   - Each update pins new IPFS metadata and calls setCID()
+6. USER → Ongoing Updates (/a/[public_id] → "Update Animal" button)
+   - POST /api/update-animal
+   - Event types: weight_update, health_check, vet_visit, update, note
+   - Updates Supabase → pins new IPFS metadata → calls setCID() on-chain
+   - Logs to animal_events table with IPFS CID + tx hash
+   - Event history displayed on animal card
+   ✅ FULLY BUILT
 
 7. USER → Compliance
-   - Recover credentials
-   - Delegate to staff member to attach more tags
-   - Send tags/NFT to own wallet (custodial → non-custodial)
-   - Sell cattle
+   - Recover credentials if lost
+   - Delegate to staff member
+   - Transfer NFT to own wallet (custodial → non-custodial)
+   - Sell cattle on-chain
+   ❌ NOT BUILT
 ```
 
-## Attach Form — ALL Required Field Sections
+---
 
-### BASIC (required at attach time)
-- ID/Tag (tag_code — auto from QR)
-- Sex
-- DOB (birth_year)
-- Breed
-- Size/Weight
+## What IS Built (as of 2026-02-27)
 
-### IDENTIFICATION (optional at attach, updatable)
-- EID (Electronic ID)
-- Secondary ID / Tag
-- Tattoo
-- Brand
+| Feature | Endpoint/Page | Status |
+|---|---|---|
+| Factory batch creation + NFT mint | `POST /api/factory/batches` | ✅ |
+| Assemble tab (assembly + shipment tracking) | `GET/POST /api/superadmin/assemble` | ✅ |
+| Inventory + retry mint | `/superadmin` Inventory tab | ✅ |
+| Superadmin password gate | `POST /api/superadmin/login` (cookie) | ✅ |
+| Tag scan landing page | `/t/[tag_code]` | ✅ |
+| Photo upload → IPFS | `POST /api/upload-photo` | ✅ |
+| Full attach form (5 sections) | `POST /api/attach-tag` | ✅ |
+| Animal public card with photo | `/a/[public_id]` | ✅ |
+| Ongoing updates + event log | `POST /api/update-animal` | ✅ |
+| NFT tokenURI update on attach+update | `setCID()` in ranchLinkTag.ts | ✅ |
+| Rate limiting on all API routes | `lib/rate-limit.ts` | ✅ |
+| Zod validation on all POST bodies | All API routes | ✅ |
+
+## What is NOT Built
+
+| Feature | Priority |
+|---|---|
+| User account creation at claim time | HIGH — needed for ownership |
+| Custodial wallet assigned to farmer | HIGH — needed for RWA |
+| NFT transfer from server wallet to farmer | HIGH — needed for true ownership |
+| Compliance section (delegate, transfer, sell) | MEDIUM |
+| Batch mint optimization (1 tx for N tags) | LOW — current: 1 tx per tag |
+| Auth on superadmin beyond password cookie | LOW |
+
+---
+
+## Attach Form — ALL Field Sections
+
+### BASIC (required)
+- name, species, breed, birth_year, sex, size, photo_url
+
+### IDENTIFICATION (optional)
+- eid, secondary_id, tattoo, brand
 
 ### ADDITIONAL (optional)
-- Owner
-- Head count
-- Labels / Tags (custom labels)
+- owner, head_count, labels (array)
 
-### CALLFHOOD (optional, livestock-specific)
-- DAID (Dam Animal ID)
-- Sire ID
-- Birth Weight
-- Weaning Weight
-- Weaning Date
-- Yearling Weight
-- Yearling Date
+### CALLFHOOD (optional)
+- dam_id, sire_id, birth_weight, weaning_weight, weaning_date, yearling_weight, yearling_date
 
 ### PURCHASE (optional)
-- Seller
-- Purchase Price
-- Purchase Date
+- seller, purchase_price, purchase_date
 
-## Key Technical Facts
+---
 
-- **Chain:** Base Mainnet
-- **Contract:** `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` (RanchLinkTag ERC-721)
-- **Server Wallet:** `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` (has MINTER_ROLE)
-- **IPFS:** Pinata (PINATA_JWT env var)
-- **DB:** Supabase (tables: tags, animals, ranches, batches, events, anchors)
-- **QR URL pattern:** `https://ranch-link.vercel.app/t/[tag_code]`
-- **Animal card URL:** `/a/[public_id]` (public_id format: AUS0001, AUS0002...)
-- **Mint:** ONE mint per tag during batch creation. NEVER mint again on attach.
-- **setCID:** Called on attach AND on every ongoing update to keep NFT metadata current.
+## Database Schema (current — Supabase)
 
-## What is NOT implemented yet (as of Feb 2026)
-- User/wallet creation at Claim time (currently anonymous)
-- IDENTIFICATION, ADDITIONAL, CALLFHOOD, PURCHASE fields in attach form + DB
-- Ongoing Updates UI for ranchers
-- Compliance section (delegate, transfer to own wallet, sell cattle)
-- Assemble tab in superadmin
-- Batch minting optimization (currently one tx per tag)
+### `animals` table key columns
+```
+id, public_id, name, species, breed, sex, birth_year, size, status,
+eid, secondary_id, tattoo, brand,
+owner, head_count, labels,
+dam_id, sire_id, birth_weight, weaning_weight, weaning_date, yearling_weight, yearling_date,
+seller, purchase_price, purchase_date,
+photo_url,  ← added 2026-02-27
+ranch_id, tag_id, created_at, updated_at
+```
+
+### `tags` table key columns
+```
+id, tag_code, chain, contract_address, token_id, mint_tx_hash,
+batch_id, ranch_id, animal_id, status, activation_state,
+metadata_cid, metadata_tx_hash, public_id,
+assembled_at, shipped_at, assembled_by,  ← added 2026-02-27
+created_at, updated_at
+```
+
+### `animal_events` table (NEW — created 2026-02-27)
+```
+id, animal_id, event_type, notes, weight, event_date,
+metadata, ipfs_cid, tx_hash, created_at
+```
+
+### `batches` table key columns
+```
+id, name, batch_name, model, material, color, chain, count,
+target_ranch_id, status, created_at
+```
+
+---
+
+## Environment Variables (all set in Vercel + .env.local)
+
+| Variable | Value / Notes |
+|---|---|
+| `NEXT_PUBLIC_CHAIN_ID` | `8453` (Base Mainnet) |
+| `NEXT_PUBLIC_APP_URL` | `https://ranch-link.vercel.app` |
+| `NEXT_PUBLIC_CONTRACT_TAG` | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` |
+| `RANCHLINKTAG_ADDRESS` | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` |
+| `SERVER_WALLET_ADDRESS` | `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` |
+| `NEXT_PUBLIC_ALCHEMY_BASE_RPC` | Alchemy Base Mainnet RPC |
+| `PINATA_JWT` | Set in Vercel ✅ |
+| `SUPABASE_SERVICE_KEY` | Set in Vercel ✅ |
+| `SUPERADMIN_PASSWORD` | `ranchlink2026` |
+
+---
+
+## Confidence Levels (current)
+
+| Step | Confidence |
+|---|---|
+| Factory mints NFT on Base Mainnet | 95% |
+| QR code prints from browser | 95% |
+| Farmer scans QR, form loads | 95% |
+| Photo upload at attach time | 95% |
+| Form submits, animal saved in Supabase | 95% |
+| IPFS pin succeeds in production | 90% |
+| setCID() updates NFT on-chain | 85% |
+| Animal card displays photo + all data | 95% |
+| Ongoing Updates synced to blockchain | 85% |
+| Superadmin protected | 100% |
+
+---
+
+## Session Resume Protocol
+
+At the start of any new session, I will:
+1. Read this file (auto-loaded via alwaysApply)
+2. Read `RANCHLINK_STATE.md` in the repo root for the latest session log
+3. Check `git log --oneline -5` for latest commits
+4. Report current state and pending next steps before touching anything
+
+**One-command resume:** "Resume RanchLink" — I will read this file + RANCHLINK_STATE.md and give a full briefing.
+
+---
+
+## Critical Rules (NEVER violate)
+
+- NEVER mint again on attach — ONE mint per tag during batch creation only
+- NEVER change the contract address without explicit confirmation
+- NEVER use Base Sepolia (84532) in production — always 8453
+- setCID is called on attach AND on every ongoing update
+- Tags without token_id CANNOT be attached or shipped — they must be minted first
+- The server wallet holds ALL NFTs — farmer wallet transfer is future work
