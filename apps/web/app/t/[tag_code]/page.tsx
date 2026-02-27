@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 
@@ -102,11 +102,7 @@ export default function TagScanPage({ params }: PageProps) {
     reader.readAsDataURL(file)
   }
 
-  useEffect(() => {
-    fetchTag()
-  }, [tag_code])
-
-  const fetchTag = async () => {
+  const fetchTag = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/tags/${tag_code}`)
@@ -128,7 +124,11 @@ export default function TagScanPage({ params }: PageProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [tag_code, router])
+
+  useEffect(() => {
+    fetchTag()
+  }, [fetchTag])
 
   const handleAttach = async (e: React.FormEvent) => {
     e.preventDefault()

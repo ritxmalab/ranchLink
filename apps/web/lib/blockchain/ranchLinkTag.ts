@@ -362,10 +362,13 @@ export async function setCID(tokenId: bigint, cid: string): Promise<`0x${string}
  * @returns Basescan URL
  */
 export function getBasescanUrl(tokenId: bigint): string {
-  const contractAddress = getContractAddress()
-  const chainId = currentChain.id
-  const baseUrl = chainId === 8453 
-    ? 'https://basescan.org' 
+  const contractAddress =
+    process.env.RANCHLINKTAG_ADDRESS ||
+    process.env.NEXT_PUBLIC_CONTRACT_TAG ||
+    '0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242'
+  const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '8453', 10)
+  const baseUrl = chainId === 8453
+    ? 'https://basescan.org'
     : 'https://sepolia.basescan.org'
   return `${baseUrl}/token/${contractAddress}?a=${tokenId.toString()}`
 }

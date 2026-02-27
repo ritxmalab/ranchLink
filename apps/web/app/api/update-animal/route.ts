@@ -91,15 +91,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update animal', details: updateError.message }, { status: 500 })
     }
 
-    // Log event
+    // Log event — capture ID so we can update it with IPFS CID + tx hash later
     const tag = Array.isArray(animal.tags) ? animal.tags[0] : animal.tags
-    await supabase.from('animal_events').insert({
+    const { data: insertedEvent } = await supabase.from('animal_events').insert({
       animal_id: animal.id,
       event_type,
       notes: event_notes || null,
       weight: event_weight || (animalFields as any).yearling_weight || (animalFields as any).weaning_weight || null,
       event_date: new Date().toISOString().slice(0, 10),
-    })
+    }).select('id').single()
 
     // Pin updated metadata to IPFS + setCID on-chain (non-blocking)
     let metadataCid: string | null = null
@@ -119,12 +119,12 @@ export async function POST(request: NextRequest) {
         const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
         metadataTxHash = await setCID(BigInt(tag.token_id), metadataCid)
 
-        // Update event with IPFS cid + tx hash
-        if (metadataCid) {
+        // Update event with IPFS cid + tx hash (use captured event ID)
+        if (metadataCid && insertedEvent?.id) {
           await supabase.from('animal_events').update({
             ipfs_cid: metadataCid,
             tx_hash: metadataTxHash,
-          }).eq('animal_id', animal.id).order('created_at', { ascending: false }).limit(1)
+          }).eq('id', insertedEvent.id)
 
           await supabase.from('tags').update({
             metadata_cid: metadataCid,
