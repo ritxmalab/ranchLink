@@ -4,7 +4,7 @@ alwaysApply: true
 ---
 
 # RanchLink — Persistent System State
-**Last updated:** 2026-02-27  
+**Last updated:** 2026-02-27 (session 2 — contract redeployed)  
 **Deployment:** https://ranch-link.vercel.app  
 **GitHub:** https://github.com/ritxmalab/ranchLink  
 **Supabase project:** utovzxpmfnzihurotqnv  
@@ -17,8 +17,8 @@ alwaysApply: true
 | Item | Value |
 |---|---|
 | Chain | Base Mainnet (chainId: 8453) |
-| Contract | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` (RanchLinkTag ERC-721) |
-| Server Wallet | `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` (has MINTER_ROLE) |
+| Contract | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` (RanchLinkTag ERC-721 — UUPS Upgradeable) |
+| Server Wallet | `0x6781Eb019e553c3C3732c4B11e6859638282ED96` (clean EOA — deployer of new contract, has MINTER_ROLE + ADMIN_ROLE) |
 | IPFS | Pinata (PINATA_JWT in .env.local and Vercel) |
 | DB | Supabase — tables: tags, animals, ranches, batches, animal_events |
 | QR URL pattern | `https://ranch-link.vercel.app/t/[tag_code]` |
@@ -178,9 +178,9 @@ target_ranch_id, status, created_at
 |---|---|
 | `NEXT_PUBLIC_CHAIN_ID` | `8453` (Base Mainnet) |
 | `NEXT_PUBLIC_APP_URL` | `https://ranch-link.vercel.app` |
-| `NEXT_PUBLIC_CONTRACT_TAG` | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` |
-| `RANCHLINKTAG_ADDRESS` | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` |
-| `SERVER_WALLET_ADDRESS` | `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` |
+| `NEXT_PUBLIC_CONTRACT_TAG` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` |
+| `RANCHLINKTAG_ADDRESS` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` |
+| `SERVER_WALLET_ADDRESS` | `0x6781Eb019e553c3C3732c4B11e6859638282ED96` |
 | `NEXT_PUBLIC_ALCHEMY_BASE_RPC` | Alchemy Base Mainnet RPC |
 | `PINATA_JWT` | Set in Vercel ✅ |
 | `SUPABASE_SERVICE_KEY` | Set in Vercel ✅ |

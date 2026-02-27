@@ -83,3 +83,45 @@ This file is the human-readable project log. Updated at the end of every Agent s
 3. **Custodial wallet assignment** — create a Privy or similar wallet per farmer at first scan
 4. **NFT transfer** — once farmer has wallet, transfer NFT from server wallet
 5. **Compliance section** — delegate access to staff, sell cattle on-chain (ERC-721 transfer)
+
+---
+
+## Session: 2026-02-27 (Part 2 — Contract Redeployment)
+
+### Critical Fix: Wallet Drain Root Cause Resolved
+
+**Problem:** Old server wallet `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` was an EIP-7702 delegated EOA (Coinbase CDP smart wallet infrastructure). Any ETH sent to it was automatically forwarded to Coinbase's infrastructure — this happened TWICE. Total lost: ~$0.0001 ETH + ~$0.0001 ETH.
+
+**Root cause:** Coinbase CDP SDK creates wallets with EIP-7702 delegation by default without disclosing this behavior. The wallet appears as a normal EOA but has smart contract code injected that auto-drains funds.
+
+**Solution implemented:**
+1. Generated new clean EOA wallet: `0x6781Eb019e553c3C3732c4B11e6859638282ED96`
+2. Verified: zero bytecode, no delegation, pure EOA
+3. Funded with 0.00004885 ETH (sent by user from gonzalobam.eth on Base)
+4. Deployed new RanchLinkTag contract: `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` (Base Mainnet, UUPS Upgradeable)
+5. New wallet auto-holds MINTER_ROLE + ADMIN_ROLE as deployer
+6. Updated ALL env vars: Vercel (4 vars) + .env.local + hardcoded fallbacks in source
+
+### Blockchain State (as of this session)
+| Item | Value |
+|---|---|
+| Chain | Base Mainnet (8453) |
+| Contract (NEW) | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` |
+| Implementation | `0x16e7dEAD5fDc99Df42d9d7e243481CC4DBE5e7a0` |
+| Server Wallet (NEW) | `0x6781Eb019e553c3C3732c4B11e6859638282ED96` |
+| Old Contract (DEAD) | `0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242` — DO NOT USE |
+| Old Wallet (DRAINED) | `0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83` — DO NOT USE |
+
+### Commits this sub-session
+- `b71d034` — `fix: redeploy contract to clean EOA wallet, update all contract addresses`
+
+### Deployment
+- **Live URL:** https://ranch-link.vercel.app
+- **State:** READY ✅
+
+### Pending (unchanged from session 1)
+- User account creation at claim time
+- Custodial wallet per farmer
+- NFT transfer from server wallet to farmer wallet
+- Compliance section (delegate, sell cattle on-chain)
+
