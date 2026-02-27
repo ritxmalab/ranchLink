@@ -933,6 +933,7 @@ export default function SuperAdminPage() {
                 No tags in inventory. Generate a batch to get started.
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1103,6 +1104,7 @@ export default function SuperAdminPage() {
                   </div>
                 )
               })()}
+              </>
             )}
           </div>
         )}
