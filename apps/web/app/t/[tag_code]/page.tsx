@@ -88,6 +88,20 @@ export default function TagScanPage({ params }: PageProps) {
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseDate, setPurchaseDate] = useState('')
 
+  // PHOTO
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    const reader = new FileReader()
+    reader.onload = () => setPhotoPreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
   useEffect(() => {
     fetchTag()
   }, [tag_code])
@@ -122,6 +136,20 @@ export default function TagScanPage({ params }: PageProps) {
     setError(null)
 
     try {
+      // Step 1: Upload photo to IPFS if provided (before attach so we have the URL)
+      let photoUrl: string | undefined
+      if (photoFile) {
+        setPhotoUploading(true)
+        const photoForm = new FormData()
+        photoForm.append('file', photoFile)
+        const photoRes = await fetch('/api/upload-photo', { method: 'POST', body: photoForm })
+        const photoData = await photoRes.json()
+        if (photoRes.ok && photoData.photo_url) {
+          photoUrl = photoData.photo_url
+        }
+        setPhotoUploading(false)
+      }
+
       const response = await fetch('/api/attach-tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +180,8 @@ export default function TagScanPage({ params }: PageProps) {
             weaning_date: weaningDate || undefined,
             yearling_weight: yearlingWeight ? parseFloat(yearlingWeight) : undefined,
             yearling_date: yearlingDate || undefined,
+            // PHOTO
+            photo_url: photoUrl || undefined,
             // PURCHASE
             seller: seller || undefined,
             purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
@@ -286,6 +316,29 @@ export default function TagScanPage({ params }: PageProps) {
               className="space-y-3"
               style={{ opacity: onChainStatus === 'off-chain' ? 0.5 : 1 }}
             >
+              {/* ── PHOTO ── */}
+              <SectionHeader title="Animal Photo" subtitle="Optional — shown on public card and NFT" />
+              <div>
+                <label className={labelClass}>Photo</label>
+                <div className="space-y-3">
+                  {photoPreview && (
+                    <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-[var(--c2)]/50">
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
+                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold"
+                      >✕</button>
+                    </div>
+                  )}
+                  <label className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-[var(--c2)]/40 rounded-lg cursor-pointer hover:border-[var(--c2)] transition-colors bg-[var(--bg-card)]">
+                    <span className="text-2xl">📷</span>
+                    <span className="text-sm text-[var(--c4)]">{photoFile ? photoFile.name : 'Take photo or choose from library'}</span>
+                    <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+                  </label>
+                </div>
+              </div>
+
               {/* ── BASIC ── */}
               <SectionHeader title="Basic Info" subtitle="Required" />
 
@@ -474,7 +527,7 @@ export default function TagScanPage({ params }: PageProps) {
                   className="btn-primary flex-1"
                   disabled={attaching || !animalName || !species || onChainStatus === 'off-chain'}
                 >
-                  {attaching ? 'Attaching...' : 'Attach Animal'}
+                  {photoUploading ? '📷 Uploading photo...' : attaching ? '⛓️ Saving & minting...' : '🐄 Attach Animal'}
                 </button>
               </div>
             </form>

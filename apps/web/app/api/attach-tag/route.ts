@@ -38,6 +38,8 @@ const attachTagSchema = z.object({
     seller: z.string().max(200).optional(),
     purchase_price: z.number().optional(),
     purchase_date: z.string().optional(),
+    // PHOTO
+    photo_url: z.string().url().optional(),
   }),
 })
 
@@ -135,6 +137,8 @@ export async function POST(request: NextRequest) {
       seller: animalData.seller || null,
       purchase_price: animalData.purchase_price || null,
       purchase_date: animalData.purchase_date || null,
+      // PHOTO
+      photo_url: animalData.photo_url || null,
     }
 
     // 4. Create or update animal

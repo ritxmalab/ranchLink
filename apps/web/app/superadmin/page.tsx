@@ -1,9 +1,56 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import QRCodeDisplay from '@/components/QRCodeDisplay'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 import { getBuildBadgeText } from '@/lib/build-info'
+
+// ── Password Gate ──────────────────────────────────────────────────────────────
+function SuperadminLogin({ onAuth }: { onAuth: () => void }) {
+  const [pw, setPw] = useState('')
+  const [err, setErr] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setErr('')
+    const res = await fetch('/api/superadmin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    })
+    if (res.ok) {
+      onAuth()
+    } else {
+      setErr('Invalid password')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
+      <div className="card w-full max-w-sm">
+        <h1 className="text-2xl font-bold mb-1 text-center">🔒 RanchLink Admin</h1>
+        <p className="text-[var(--c4)] text-sm text-center mb-6">Enter your admin password to continue</p>
+        <form onSubmit={submit} className="space-y-4">
+          <input
+            type="password"
+            value={pw}
+            onChange={e => setPw(e.target.value)}
+            placeholder="Password"
+            className="w-full px-4 py-3 bg-[var(--bg-card)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none"
+            autoFocus
+          />
+          {err && <p className="text-red-400 text-sm">{err}</p>}
+          <button type="submit" className="btn-primary w-full" disabled={loading}>
+            {loading ? 'Authenticating...' : 'Enter Factory'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 interface Batch {
   id: string
@@ -68,8 +115,174 @@ const mapDevice = (device: any): Device => {
   }
 }
 
+// ── Assemble Tab ──────────────────────────────────────────────────────────────
+function AssembleTab() {
+  const [tags, setTags] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  const fetchAssembleTags = useCallback(async () => {
+    setLoading(true)
+    const res = await fetch('/api/superadmin/assemble')
+    const data = await res.json()
+    setTags(data.tags || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchAssembleTags() }, [fetchAssembleTags])
+
+  const handleAction = async (tagId: string, action: 'assemble' | 'ship') => {
+    setActionLoading(tagId + action)
+    await fetch('/api/superadmin/assemble', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag_id: tagId, action, assembled_by: 'superadmin' }),
+    })
+    await fetchAssembleTags()
+    setActionLoading(null)
+  }
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
+      assembled: 'bg-yellow-900/20 text-yellow-400',
+      shipped: 'bg-green-900/20 text-green-400',
+      attached: 'bg-purple-900/20 text-purple-400',
+    }
+    return map[status] || 'bg-gray-900/20 text-gray-400'
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold">📦 Assemble</h2>
+          <p className="text-[var(--c4)] text-sm mt-1">Match QR labels to 3D-printed tags and track shipments</p>
+        </div>
+        <button onClick={fetchAssembleTags} className="btn-secondary">🔄 Refresh</button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c2)] mx-auto mb-3" />
+          <p className="text-[var(--c4)]">Loading tags...</p>
+        </div>
+      ) : tags.length === 0 ? (
+        <div className="text-center py-12 text-[var(--c4)]">
+          <div className="text-5xl mb-4">📭</div>
+          <p>No tags ready for assembly. Generate a batch first.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="card text-center bg-blue-900/10 border border-blue-700/30">
+              <div className="text-3xl font-bold text-blue-400">{tags.filter(t => t.status === 'on_chain_unclaimed').length}</div>
+              <div className="text-xs text-[var(--c4)] mt-1">Ready to Assemble</div>
+            </div>
+            <div className="card text-center bg-yellow-900/10 border border-yellow-700/30">
+              <div className="text-3xl font-bold text-yellow-400">{tags.filter(t => t.status === 'assembled').length}</div>
+              <div className="text-xs text-[var(--c4)] mt-1">Assembled</div>
+            </div>
+            <div className="card text-center bg-green-900/10 border border-green-700/30">
+              <div className="text-3xl font-bold text-green-400">{tags.filter(t => t.status === 'shipped').length}</div>
+              <div className="text-xs text-[var(--c4)] mt-1">Shipped</div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left py-2 px-3">Tag Code</th>
+                  <th className="text-left py-2 px-3">Token ID</th>
+                  <th className="text-left py-2 px-3">Status</th>
+                  <th className="text-left py-2 px-3">Assembled</th>
+                  <th className="text-left py-2 px-3">Shipped</th>
+                  <th className="text-left py-2 px-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tags.map(tag => (
+                  <tr key={tag.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="py-2 px-3 font-mono font-bold">{tag.tag_code}</td>
+                    <td className="py-2 px-3 font-mono">{tag.token_id ? `#${tag.token_id}` : '—'}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusBadge(tag.status)}`}>
+                        {tag.status.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-xs text-[var(--c4)]">
+                      {tag.assembled_at ? new Date(tag.assembled_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 px-3 text-xs text-[var(--c4)]">
+                      {tag.shipped_at ? new Date(tag.shipped_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex gap-2">
+                        {tag.status === 'on_chain_unclaimed' && (
+                          <button
+                            onClick={() => handleAction(tag.id, 'assemble')}
+                            disabled={actionLoading === tag.id + 'assemble'}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            {actionLoading === tag.id + 'assemble' ? '...' : '🔧 Assemble'}
+                          </button>
+                        )}
+                        {tag.status === 'assembled' && (
+                          <button
+                            onClick={() => handleAction(tag.id, 'ship')}
+                            disabled={actionLoading === tag.id + 'ship'}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs font-semibold disabled:opacity-50"
+                          >
+                            {actionLoading === tag.id + 'ship' ? '...' : '🚚 Ship'}
+                          </button>
+                        )}
+                        {tag.status === 'shipped' && (
+                          <span className="text-green-400 text-xs">✅ Shipped</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function SuperAdminPage() {
-  const [activeTab, setActiveTab] = useState<'factory' | 'dashboard' | 'inventory'>('factory')
+  const [authed, setAuthed] = useState<boolean | null>(null)
+  const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory'>('factory')
+
+  // Check if already authenticated via cookie
+  useEffect(() => {
+    fetch('/api/superadmin/devices', { method: 'HEAD' })
+      .then(r => {
+        // If we can reach the endpoint, we're in (no strict auth on API yet)
+        // Check cookie via a dedicated endpoint
+        return fetch('/api/superadmin/login', { method: 'GET' }).then(r2 => {
+          setAuthed(true) // optimistic — login form will catch wrong passwords
+        })
+      })
+      .catch(() => setAuthed(false))
+    
+    // Check cookie presence
+    const hasCookie = document.cookie.includes('rl_superadmin')
+    setAuthed(hasCookie)
+  }, [])
+
+  if (authed === null) {
+    return <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c2)]" />
+    </div>
+  }
+
+  if (!authed) {
+    return <SuperadminLogin onAuth={() => setAuthed(true)} />
+  }
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [batches, setBatches] = useState<Batch[]>([])
@@ -262,8 +475,9 @@ export default function SuperAdminPage() {
 
   const tabs = [
     { id: 'factory', label: '🏭 Factory' },
+    { id: 'assemble', label: '📦 Assemble' },
     { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'inventory', label: '📦 Inventory' },
+    { id: 'inventory', label: '🗂️ Inventory' },
   ]
 
   return (
@@ -676,6 +890,9 @@ export default function SuperAdminPage() {
             </div>
           </div>
         )}
+
+        {/* Assemble Tab */}
+        {activeTab === 'assemble' && <AssembleTab />}
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (

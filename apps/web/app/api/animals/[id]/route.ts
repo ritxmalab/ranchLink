@@ -37,25 +37,17 @@ export async function GET(
       return NextResponse.json({ error: 'Animal not found' }, { status: 404 })
     }
 
-    // Get events
+    // Get animal events (ongoing updates log)
     const { data: events } = await supabase
-      .from('events')
+      .from('animal_events')
       .select('*')
-      .eq('public_id', publicId)
+      .eq('animal_id', animal.id)
       .order('created_at', { ascending: false })
       .limit(50)
-
-    // Get anchors
-    const { data: anchors } = await supabase
-      .from('anchors')
-      .select('*')
-      .eq('public_id', publicId)
-      .order('created_at', { ascending: false })
 
     return NextResponse.json({
       animal,
       events: events || [],
-      anchors: anchors || [],
     })
   } catch (error: any) {
     console.error('Get animal error:', error)
