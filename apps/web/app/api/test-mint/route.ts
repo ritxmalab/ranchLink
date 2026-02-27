@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     try {
       const { createPublicClient, http, formatEther } = await import('viem')
       const { base } = await import('@/lib/blockchain/config')
-      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83'
+      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6781Eb019e553c3C3732c4B11e6859638282ED96'
       
       const publicClient = createPublicClient({
         chain: base,
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         transport: http(process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC || process.env.ALCHEMY_BASE_RPC || 'https://mainnet.base.org'),
       })
 
-      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83'
+      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6781Eb019e553c3C3732c4B11e6859638282ED96'
       const MINTER_ROLE = '0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6'
       
       const hasRole = await publicClient.readContract({

@@ -17,7 +17,7 @@ export async function GET() {
   checks.RANCHLINKTAG_ADDRESS = process.env.RANCHLINKTAG_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_TAG || 'MISSING'
   checks.NEXT_PUBLIC_ALCHEMY_BASE_RPC = !!process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC
   checks.ALCHEMY_BASE_RPC = !!process.env.ALCHEMY_BASE_RPC
-  checks.SERVER_WALLET_ADDRESS = process.env.SERVER_WALLET_ADDRESS || '0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83'
+  checks.SERVER_WALLET_ADDRESS = process.env.SERVER_WALLET_ADDRESS || '0x6781Eb019e553c3C3732c4B11e6859638282ED96'
   
   console.error('[HEALTH-MINT] Environment check:', JSON.stringify(checks, null, 2))
   

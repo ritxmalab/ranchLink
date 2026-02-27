@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     try {
       const { createPublicClient, http, formatEther } = await import('viem')
       const { base } = await import('@/lib/blockchain/config')
-      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83'
+      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6781Eb019e553c3C3732c4B11e6859638282ED96'
       
       const publicClient = createPublicClient({
         chain: base,
@@ -132,13 +132,13 @@ export async function POST(request: NextRequest) {
       const balanceEth = formatEther(balance)
       preflightChecks.push(`✓ Server wallet balance: ${balanceEth} ETH`)
       
-      // Base mainnet gas is very cheap (~$0.01-0.05 per mint)
-      // Minimum balance: 0.0001 ETH should be enough for 1-2 mints
-      if (parseFloat(balanceEth) < 0.0001) {
-        preflightErrors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.0001 ETH for gas)`)
-      } else if (parseFloat(balanceEth) < 0.001) {
+      // Base mainnet gas is very cheap (~$0.000005-0.00002 ETH per mint)
+      // Minimum balance: 0.00001 ETH is enough for 1-2 mints on Base
+      if (parseFloat(balanceEth) < 0.00001) {
+        preflightErrors.push(`Insufficient balance: ${balanceEth} ETH (need at least 0.00001 ETH for gas)`)
+      } else if (parseFloat(balanceEth) < 0.0001) {
         // Warn but don't block if balance is low but above minimum
-        preflightChecks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.001+ ETH for multiple mints)`)
+        preflightChecks.push(`⚠️ Low balance: ${balanceEth} ETH (recommended: 0.0001+ ETH for multiple mints)`)
       }
     } catch (balanceError: any) {
       console.warn('[FACTORY] Could not check wallet balance:', balanceError.message)

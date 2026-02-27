@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     try {
       const { createPublicClient, http, formatEther } = await import('viem')
       const { base } = await import('@/lib/blockchain/config')
-      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6801078adCbEF93B9b7a5cbFb3BAb87Fdb9F8d83'
+      const serverWalletAddress = process.env.SERVER_WALLET_ADDRESS || '0x6781Eb019e553c3C3732c4B11e6859638282ED96'
       
       const publicClient = createPublicClient({
         chain: base,
