@@ -59,7 +59,7 @@ export default function TagScanPage({ params }: PageProps) {
   const [animalName, setAnimalName] = useState('')
   const [species, setSpecies] = useState('Cattle')
   const [breed, setBreed] = useState('')
-  const [birthYear, setBirthYear] = useState(new Date().getFullYear() - 1)
+  const [birthYear, setBirthYear] = useState<number | ''>('')
   const [sex, setSex] = useState('')
   const [size, setSize] = useState('')
 
@@ -380,7 +380,7 @@ export default function TagScanPage({ params }: PageProps) {
                 <div>
                   <label className={labelClass}>Birth Year</label>
                   <input type="number" value={birthYear}
-                    onChange={(e) => setBirthYear(parseInt(e.target.value) || new Date().getFullYear() - 1)}
+                    onChange={(e) => setBirthYear(e.target.value === '' ? '' : parseInt(e.target.value))}
                     min="1900" max={new Date().getFullYear()} className={inputClass} />
                 </div>
               </div>
