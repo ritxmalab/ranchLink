@@ -35,12 +35,12 @@ export async function GET(
 
     if (error || !tag) {
       return NextResponse.json(
-        { error: 'Tag not found' },
+        { error: 'Tag not found', supabase_error: error?.message },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ tag })
+    return NextResponse.json({ tag, _debug: { key_prefix: process.env.SUPABASE_SERVICE_KEY?.substring(0, 15) } })
   } catch (error: any) {
     console.error('Get tag error:', error)
     return NextResponse.json(
