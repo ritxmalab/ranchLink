@@ -3,6 +3,8 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const updateSchema = z.object({
   public_id: z.string().min(1),
   // BASIC
@@ -33,8 +35,11 @@ const updateSchema = z.object({
   seller: z.string().max(200).optional(),
   purchase_price: z.number().optional(),
   purchase_date: z.string().optional(),
-  // EVENT metadata
+  // EVENT metadata — accept both old (event_notes/event_weight) and new (notes/weight) field names
   event_type: z.enum(['weight_update', 'health_check', 'vet_visit', 'update', 'note']).default('update'),
+  notes: z.string().max(1000).optional(),
+  weight: z.number().optional(),
+  // Legacy field names (kept for backward compat)
   event_notes: z.string().max(1000).optional(),
   event_weight: z.number().optional(),
 })
@@ -60,7 +65,10 @@ export async function POST(request: NextRequest) {
       throw e
     }
 
-    const { public_id, event_type, event_notes, event_weight, ...animalFields } = validated
+    const { public_id, event_type, notes, weight, event_notes, event_weight, ...animalFields } = validated
+    // Normalize field names — prefer new names, fall back to legacy
+    const resolvedNotes = notes ?? event_notes
+    const resolvedWeight = weight ?? event_weight
     const supabase = getSupabaseServerClient()
 
     // Load current animal + tag
@@ -96,8 +104,8 @@ export async function POST(request: NextRequest) {
     const { data: insertedEvent } = await supabase.from('animal_events').insert({
       animal_id: animal.id,
       event_type,
-      notes: event_notes || null,
-      weight: event_weight || (animalFields as any).yearling_weight || (animalFields as any).weaning_weight || null,
+      notes: resolvedNotes ?? null,
+      weight: resolvedWeight ?? null,
       event_date: new Date().toISOString().slice(0, 10),
     }).select('id').single()
 
@@ -116,8 +124,18 @@ export async function POST(request: NextRequest) {
         const { pinAnimalMetadata } = await import('@/lib/ipfs/client')
         metadataCid = await pinAnimalMetadata(freshAnimal, null)
 
-        const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
-        metadataTxHash = await setCID(BigInt(tag.token_id), metadataCid)
+        // Route to correct contract: ERC-1155 for pre_identity/lazy-minted, ERC-721 for legacy
+        const tagStatus = (tag as any).status
+        const use1155 = process.env.RANCHLINKTAG_1155_ADDRESS && tagStatus === 'attached'
+          && !!(tag as any).metadata?.batch_id_hex
+
+        if (use1155) {
+          const { setCID1155 } = await import('@/lib/blockchain/ranchLinkTag1155')
+          metadataTxHash = await setCID1155(BigInt(tag.token_id), metadataCid)
+        } else {
+          const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
+          metadataTxHash = await setCID(BigInt(tag.token_id), metadataCid)
+        }
 
         // Update event with IPFS cid + tx hash (use captured event ID)
         if (metadataCid && insertedEvent?.id) {

@@ -5,6 +5,8 @@ import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 // Schema de validación
 const retryMintSchema = z.object({
   tagCode: z.string().min(1).max(20),

@@ -3,6 +3,8 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const attachTagSchema = z.object({
   tagCode: z.string().min(1).max(20),
   animalData: z.object({
@@ -116,33 +118,33 @@ export async function POST(request: NextRequest) {
     const animalPayload = {
       name: animalData.name,
       species: animalData.species,
-      breed: animalData.breed || null,
-      birth_year: animalData.birth_year || null,
-      sex: animalData.sex || null,
-      size: animalData.size || null,
+      breed: animalData.breed ?? null,
+      birth_year: animalData.birth_year ?? null,
+      sex: animalData.sex ?? null,
+      size: animalData.size ?? null,
       // IDENTIFICATION
-      eid: animalData.eid || null,
-      secondary_id: animalData.secondary_id || null,
-      tattoo: animalData.tattoo || null,
-      brand: animalData.brand || null,
+      eid: animalData.eid ?? null,
+      secondary_id: animalData.secondary_id ?? null,
+      tattoo: animalData.tattoo ?? null,
+      brand: animalData.brand ?? null,
       // ADDITIONAL
-      owner: animalData.owner || null,
-      head_count: animalData.head_count || null,
-      labels: animalData.labels || null,
-      // CALLFHOOD
-      dam_id: animalData.dam_id || null,
-      sire_id: animalData.sire_id || null,
-      birth_weight: animalData.birth_weight || null,
-      weaning_weight: animalData.weaning_weight || null,
-      weaning_date: animalData.weaning_date || null,
-      yearling_weight: animalData.yearling_weight || null,
-      yearling_date: animalData.yearling_date || null,
+      owner: animalData.owner ?? null,
+      head_count: animalData.head_count ?? null,
+      labels: animalData.labels ?? null,
+      // CALLFHOOD — use ?? so 0 values are preserved
+      dam_id: animalData.dam_id ?? null,
+      sire_id: animalData.sire_id ?? null,
+      birth_weight: animalData.birth_weight ?? null,
+      weaning_weight: animalData.weaning_weight ?? null,
+      weaning_date: animalData.weaning_date ?? null,
+      yearling_weight: animalData.yearling_weight ?? null,
+      yearling_date: animalData.yearling_date ?? null,
       // PURCHASE
-      seller: animalData.seller || null,
-      purchase_price: animalData.purchase_price || null,
-      purchase_date: animalData.purchase_date || null,
+      seller: animalData.seller ?? null,
+      purchase_price: animalData.purchase_price ?? null,
+      purchase_date: animalData.purchase_date ?? null,
       // PHOTO
-      photo_url: animalData.photo_url || null,
+      photo_url: animalData.photo_url ?? null,
     }
 
     // 4. Create or update animal
@@ -215,10 +217,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 5b. Write tag_id back to animal so the reverse lookup works
-    await supabase
+    const { error: tagLinkError } = await supabase
       .from('animals')
       .update({ tag_id: tag.id })
       .eq('id', animalId)
+    if (tagLinkError) {
+      console.error('[ATTACH-TAG] Failed to write tag_id to animal:', tagLinkError.message)
+    }
 
     // 6. Pin metadata to IPFS
     let metadataCid: string | null = null

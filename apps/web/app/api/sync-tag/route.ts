@@ -5,6 +5,8 @@ import { base } from '@/lib/blockchain/config'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 // Schema de validación
 const syncTagSchema = z.object({
   tagCode: z.string().min(1).max(20),

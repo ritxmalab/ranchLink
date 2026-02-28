@@ -36,13 +36,17 @@ export const baseSepolia = defineChain({
   },
 })
 
-// Get current chain (use testnet for development)
-export const currentChain = process.env.NEXT_PUBLIC_CHAIN_ID === '8453' ? base : baseSepolia
+// Default to mainnet — only use testnet if explicitly configured
+export const currentChain = process.env.NEXT_PUBLIC_CHAIN_ID === '84532' ? baseSepolia : base
 
-// Public client for read operations
+// Public client for read operations — always use configured RPC, never the public rate-limited endpoint
+const rpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC
+  || process.env.ALCHEMY_BASE_RPC
+  || 'https://mainnet.base.org'
+
 export const publicClient = createPublicClient({
   chain: currentChain,
-  transport: http(),
+  transport: http(rpcUrl),
 })
 
 // Contract addresses

@@ -237,7 +237,11 @@ export default function TagScanPage({ params }: PageProps) {
   if (!tag) return null
 
   const basescanUrl = tag.token_id ? getBasescanUrl(BigInt(tag.token_id)) : null
-  const onChainStatus = tag.token_id && tag.contract_address ? 'on-chain' : 'off-chain'
+  // pre_identity = Merkle-anchored ERC-1155 tag — valid for attachment (lazy mints at claim)
+  const onChainStatus: 'on-chain' | 'anchored' | 'off-chain' =
+    tag.token_id && tag.contract_address ? 'on-chain'
+    : tag.status === 'pre_identity' ? 'anchored'
+    : 'off-chain'
 
   return (
     <div className="min-h-screen bg-[var(--bg)] py-8 px-4">
@@ -248,11 +252,13 @@ export default function TagScanPage({ params }: PageProps) {
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-3xl font-bold">Tag: {tag_code}</h1>
             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              onChainStatus === 'on-chain'
-                ? 'bg-green-900/20 text-green-400'
-                : 'bg-yellow-900/20 text-yellow-400'
+              onChainStatus === 'on-chain' ? 'bg-green-900/20 text-green-400'
+              : onChainStatus === 'anchored' ? 'bg-cyan-900/20 text-cyan-400'
+              : 'bg-yellow-900/20 text-yellow-400'
             }`}>
-              {onChainStatus === 'on-chain' ? '✅ ON-CHAIN' : '⚪ OFF-CHAIN'}
+              {onChainStatus === 'on-chain' ? '✅ ON-CHAIN'
+               : onChainStatus === 'anchored' ? '⚓ ANCHORED'
+               : '⚪ OFF-CHAIN'}
             </span>
           </div>
 
@@ -291,6 +297,14 @@ export default function TagScanPage({ params }: PageProps) {
               </p>
             </div>
 
+            {onChainStatus === 'anchored' && (
+              <div className="mb-4 p-4 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
+                <p className="text-cyan-400 font-semibold mb-1">⚓ Tag Anchored On-Chain</p>
+                <p className="text-cyan-300 text-sm">
+                  This tag has a verified on-chain identity. Your NFT will be minted when you attach your animal.
+                </p>
+              </div>
+            )}
             {onChainStatus === 'off-chain' && (
               <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
                 <p className="text-yellow-400 font-semibold mb-1">⚠️ Tag Not On-Chain</p>
@@ -529,6 +543,7 @@ export default function TagScanPage({ params }: PageProps) {
                   type="submit"
                   className="btn-primary flex-1"
                   disabled={attaching || !animalName || !species || onChainStatus === 'off-chain'}
+                  // anchored and on-chain are both valid — only off-chain blocks submission
                 >
                   {photoUploading ? '📷 Uploading photo...' : attaching ? '⛓️ Saving & minting...' : '🐄 Attach Animal'}
                 </button>

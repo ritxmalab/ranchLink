@@ -141,11 +141,14 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
       const payload: any = {
         public_id,
         event_type: updateEventType,
-        event_notes: updateNotes || undefined,
-        event_weight: updateWeight ? parseFloat(updateWeight) : undefined,
+        notes: updateNotes || undefined,
+        weight: updateWeight ? parseFloat(updateWeight) : undefined,
       }
       if (photoUrl) payload.photo_url = photoUrl
-      if (updateWeight) payload.yearling_weight = parseFloat(updateWeight)
+      // Only update yearling_weight for explicit weight-recording events, not all updates
+      if (updateWeight && updateEventType === 'weight_update') {
+        payload.yearling_weight = parseFloat(updateWeight)
+      }
 
       const res = await fetch('/api/update-animal', {
         method: 'POST',

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 import { z } from 'zod'
+
+export const dynamic = 'force-dynamic'
 
 const assembleSchema = z.object({
   tag_id: z.string().uuid(),
@@ -16,6 +19,9 @@ const assembleSchema = z.object({
  *   ship             → status: shipped    (dispatched — triggered from Inventory, not Assemble)
  */
 export async function POST(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   if (!rateLimit(request, 30, 60000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
@@ -80,6 +86,9 @@ export async function POST(request: NextRequest) {
  * Uses direct REST fetch to avoid JS client connection pool staleness.
  */
 export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_KEY
@@ -89,7 +98,7 @@ export async function GET(request: NextRequest) {
   }
 
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,assembled)&select=id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id&order=created_at.desc`,
+    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id,metadata&order=created_at.desc`,
     {
       headers: {
         'apikey': serviceKey,

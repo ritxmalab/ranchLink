@@ -57,6 +57,8 @@ contract RanchLinkTag1155 is ERC1155, AccessControl {
         string calldata batchURI
     ) external onlyRole(MINTER_ROLE) {
         require(batchRoots[batchId] == bytes32(0), "Batch already anchored");
+        require(merkleRoot != bytes32(0), "Empty merkle root");
+        require(bytes(batchURI).length > 0, "Empty batch URI");
         batchRoots[batchId] = merkleRoot;
         batchURIs[batchId]  = batchURI;
         emit BatchAnchored(batchId, merkleRoot, batchURI, block.timestamp);

@@ -11,6 +11,12 @@ export function buildTagMerkleTree(tagCodes: string[]): {
 } {
   if (tagCodes.length === 0) throw new Error('Cannot build Merkle tree from empty array')
 
+  // Deduplicate to prevent proof corruption from duplicate leaves
+  const unique = [...new Set(tagCodes)]
+  if (unique.length !== tagCodes.length) {
+    throw new Error(`Duplicate tag codes detected: ${tagCodes.length - unique.length} duplicates`)
+  }
+
   // Compute leaves
   const leaves: `0x${string}`[] = tagCodes.map(code =>
     keccak256(encodePacked(['string'], [code]))
@@ -18,10 +24,13 @@ export function buildTagMerkleTree(tagCodes: string[]): {
 
   // Sort leaves for deterministic tree (standard practice)
   const sortedLeaves = [...leaves].sort()
+
+  // Build leafIndex from sorted array directly (not via indexOf, which breaks on duplicates)
   const leafIndex: Record<string, number> = {}
-  tagCodes.forEach(code => {
-    const leaf = keccak256(encodePacked(['string'], [code]))
-    leafIndex[code] = sortedLeaves.indexOf(leaf)
+  sortedLeaves.forEach((leaf, idx) => {
+    // Find which tagCode produced this leaf
+    const code = tagCodes.find(c => keccak256(encodePacked(['string'], [c])) === leaf)
+    if (code !== undefined) leafIndex[code] = idx
   })
 
   // Build tree layers bottom-up

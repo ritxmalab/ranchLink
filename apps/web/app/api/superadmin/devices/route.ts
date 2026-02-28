@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
+
+export const dynamic = 'force-dynamic'
 
 // Helper to map metadata fields into flat structure
 function mapDevice(record: any) {
@@ -18,7 +21,10 @@ function mapDevice(record: any) {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     // Check environment variables first
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
@@ -58,7 +64,11 @@ export async function GET(request: Request) {
       .limit(limit)
     
     const { data: tagsData, error } = await query.order('created_at', { ascending: false })
-    
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
     // Get batch info for tags that have batch_id
     const batchIds = [...new Set((tagsData || []).map((t: any) => t.batch_id).filter(Boolean))]
     let batchesMap: Record<string, any> = {}
@@ -114,10 +124,6 @@ export async function GET(request: Request) {
         },
       }
     })
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
 
     return NextResponse.json({ devices: data || [] })
   } catch (err: any) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 import { z } from 'zod'
 import { keccak256, encodePacked } from 'viem'
 
@@ -35,6 +36,9 @@ const batchSchema = z.object({
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   console.error('[FACTORY-v2] Starting Merkle batch creation...')
+
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
 
   if (!rateLimit(request, 5, 60000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
@@ -106,11 +110,8 @@ export async function POST(request: NextRequest) {
   const { buildTagMerkleTree } = await import('@/lib/blockchain/merkle')
   const { root: merkleRoot, proofs } = buildTagMerkleTree(tagCodes)
 
-  // ── 5. Derive batchId (deterministic) ──────────────────────────────────────
-  const batchId = keccak256(encodePacked(
-    ['string', 'string'],
-    [batch.id, new Date().toISOString()]
-  ))
+  // ── 5. Derive batchId (deterministic — no timestamp, reproducible) ─────────
+  const batchId = keccak256(encodePacked(['string'], [batch.id]))
 
   // ── 6. Pin batch manifest to IPFS ──────────────────────────────────────────
   let batchURI = `data:application/json,${encodeURIComponent(JSON.stringify({
@@ -183,6 +184,17 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify(chunk),
     })
+    if (!res.ok) {
+      const errBody = await res.text()
+      console.error(`[FACTORY-v2] Tag insert chunk ${i}–${i + CHUNK} failed:`, errBody)
+      // Mark batch as failed and abort
+      await fetch(`${supabaseUrl}/rest/v1/batches?id=eq.${batch.id}`, {
+        method: 'PATCH',
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'insert_failed' }),
+      })
+      return NextResponse.json({ error: 'Failed to insert tags into database', details: errBody }, { status: 500 })
+    }
     const inserted = await res.json()
     if (Array.isArray(inserted)) insertedTags.push(...inserted)
   }

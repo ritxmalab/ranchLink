@@ -1,26 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateLimit } from '@/lib/rate-limit'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
+import { z } from 'zod'
+
+export const dynamic = 'force-dynamic'
+
+const verifySchema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/, 'Invalid tx hash format'),
+  tagCode: z.string().regex(/^RL-\d{3,}$/, 'Invalid tag code format'),
+})
 
 /**
  * POST /api/verify-tx
- * Verify a transaction hash and update tag status if mint was successful
- * This is used when mint times out but transaction might have completed
+ * Verify a transaction hash and update tag status if mint was successful.
+ * Superadmin-only endpoint.
  */
 export async function POST(request: NextRequest) {
-  try {
-    const { txHash, tagCode } = await request.json()
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
 
-    if (!txHash || !tagCode) {
-      return NextResponse.json(
-        { error: 'Missing txHash or tagCode' },
-        { status: 400 }
-      )
+  if (!rateLimit(request, 20, 60000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
+  try {
+    let txHash: string, tagCode: string
+    try {
+      const parsed = verifySchema.parse(await request.json())
+      txHash = parsed.txHash
+      tagCode = parsed.tagCode
+    } catch (e: any) {
+      return NextResponse.json({ error: 'Invalid input', details: e.errors || e.message }, { status: 400 })
     }
 
     // Check transaction status on blockchain
     const { createPublicClient, http } = await import('viem')
     const { base } = await import('@/lib/blockchain/config')
     const rpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC || process.env.ALCHEMY_BASE_RPC || 'https://mainnet.base.org'
-    const contractAddress = (process.env.RANCHLINKTAG_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_TAG) as `0x${string}`
+    const rawAddr = process.env.RANCHLINKTAG_ADDRESS || process.env.NEXT_PUBLIC_CONTRACT_TAG
+    if (!rawAddr) {
+      return NextResponse.json({ error: 'RANCHLINKTAG_ADDRESS not configured' }, { status: 500 })
+    }
+    const contractAddress = rawAddr as `0x${string}`
 
     const publicClient = createPublicClient({
       chain: base,
