@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 const assembleSchema = z.object({
   tag_id: z.string().uuid(),
-  action: z.enum(['assemble', 'ship']),
+  action: z.enum(['assemble', 'push_to_inventory', 'ship']),
   assembled_by: z.string().max(100).optional(),
 })
 
@@ -37,6 +37,9 @@ export async function POST(request: NextRequest) {
     update.assembled_at = now
     update.assembled_by = validated.assembled_by || 'superadmin'
     update.status = 'assembled'
+  } else if (validated.action === 'push_to_inventory') {
+    // Tag is physically assembled and moved to inventory — no longer shown in Assemble tab
+    update.status = 'in_inventory'
   } else {
     update.shipped_at = now
     update.status = 'shipped'
@@ -61,9 +64,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const supabase = getSupabaseServerClient()
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+
   const { data: tags, error } = await supabase
     .from('tags')
-    .select('id, tag_code, token_id, contract_address, status, chain, assembled_at, shipped_at, assembled_by, created_at, batch_id')
+    .select('id, tag_code, token_id, mint_tx_hash, contract_address, status, chain, assembled_at, shipped_at, assembled_by, created_at, batch_id')
     .in('status', ['on_chain_unclaimed', 'assembled', 'shipped'])
     .order('created_at', { ascending: false })
 
@@ -71,5 +76,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ tags: tags || [] })
+  const enriched = (tags || []).map(t => ({
+    ...t,
+    base_qr_url: `${appUrl}/t/${t.tag_code}`,
+    // Composite display code: tag_code + first 8 chars of mint tx hash
+    display_token_id: t.mint_tx_hash
+      ? `${t.tag_code}-${t.mint_tx_hash.replace('0x', '').substring(0, 8).toUpperCase()}`
+      : t.token_id ? `#${t.token_id}` : '—',
+  }))
+
+  return NextResponse.json({ tags: enriched })
 }

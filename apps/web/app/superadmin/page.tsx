@@ -115,11 +115,55 @@ const mapDevice = (device: any): Device => {
   }
 }
 
+// ── Composite token display code ─────────────────────────────────────────────
+// Format: RL-008-39ECF320  (tag_code + first 8 hex chars of mint tx)
+function formatTokenCode(tag: { tag_code?: string; token_id?: string | null; mint_tx_hash?: string | null }) {
+  if (tag.mint_tx_hash) {
+    const hex = tag.mint_tx_hash.replace('0x', '').substring(0, 8).toUpperCase()
+    return `${tag.tag_code}-${hex}`
+  }
+  if (tag.token_id) return `${tag.tag_code}-#${tag.token_id}`
+  return '—'
+}
+
+// ── Individual QR print (30 mm card) ─────────────────────────────────────────
+function printSingleQR(tag: any) {
+  const tokenCode = formatTokenCode(tag)
+  const url = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
+  const win = window.open('', '_blank', 'width=400,height=520')
+  if (!win) return
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>QR ${tag.tag_code}</title>
+<style>
+  @page { size: 38mm 38mm; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { width: 38mm; height: 38mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: monospace; background: white; }
+  .code { font-size: 7pt; font-weight: bold; text-align: center; margin-bottom: 1mm; }
+  .token { font-size: 6pt; color: #555; text-align: center; margin-bottom: 1mm; }
+  img { width: 28mm; height: 28mm; }
+</style>
+</head>
+<body>
+<div class="code">${tag.tag_code}</div>
+<div class="token">${tokenCode}</div>
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" />
+<div class="token" style="margin-top:1mm;font-size:5pt;">${url.replace('https://','')}</div>
+<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1000)}<\/script>
+</body>
+</html>`)
+  win.document.close()
+}
+
 // ── Assemble Tab ──────────────────────────────────────────────────────────────
 function AssembleTab() {
   const [tags, setTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  // Track which tags have been printed (required before Assemble)
+  const [printed, setPrinted] = useState<Set<string>>(new Set())
 
   const fetchAssembleTags = useCallback(async () => {
     setLoading(true)
@@ -131,7 +175,7 @@ function AssembleTab() {
 
   useEffect(() => { fetchAssembleTags() }, [fetchAssembleTags])
 
-  const handleAction = async (tagId: string, action: 'assemble' | 'ship') => {
+  const handleAction = async (tagId: string, action: 'assemble' | 'push_to_inventory') => {
     setActionLoading(tagId + action)
     await fetch('/api/superadmin/assemble', {
       method: 'POST',
@@ -142,22 +186,30 @@ function AssembleTab() {
     setActionLoading(null)
   }
 
+  const markPrinted = (tagId: string, tag: any) => {
+    printSingleQR(tag)
+    setPrinted(prev => new Set(prev).add(tagId))
+  }
+
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
       on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
       assembled: 'bg-yellow-900/20 text-yellow-400',
-      shipped: 'bg-green-900/20 text-green-400',
+      in_inventory: 'bg-green-900/20 text-green-400',
       attached: 'bg-purple-900/20 text-purple-400',
     }
     return map[status] || 'bg-gray-900/20 text-gray-400'
   }
+
+  // Only show tags in the assemble workflow (not yet pushed to inventory)
+  const workflowTags = tags.filter(t => t.status === 'on_chain_unclaimed' || t.status === 'assembled')
 
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold">📦 Assemble</h2>
-          <p className="text-[var(--c4)] text-sm mt-1">Match QR labels to 3D-printed tags and track shipments</p>
+          <p className="text-[var(--c4)] text-sm mt-1">Print QR label → attach to 3D tag → push to inventory</p>
         </div>
         <button onClick={fetchAssembleTags} className="btn-secondary">🔄 Refresh</button>
       </div>
@@ -167,85 +219,105 @@ function AssembleTab() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--c2)] mx-auto mb-3" />
           <p className="text-[var(--c4)]">Loading tags...</p>
         </div>
-      ) : tags.length === 0 ? (
+      ) : workflowTags.length === 0 ? (
         <div className="text-center py-12 text-[var(--c4)]">
           <div className="text-5xl mb-4">📭</div>
-          <p>No tags ready for assembly. Generate a batch first.</p>
+          <p>No tags pending assembly. Generate a batch first.</p>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          {/* Summary counters */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="card text-center bg-blue-900/10 border border-blue-700/30">
-              <div className="text-3xl font-bold text-blue-400">{tags.filter(t => t.status === 'on_chain_unclaimed').length}</div>
+              <div className="text-3xl font-bold text-blue-400">{workflowTags.filter(t => t.status === 'on_chain_unclaimed').length}</div>
               <div className="text-xs text-[var(--c4)] mt-1">Ready to Assemble</div>
             </div>
             <div className="card text-center bg-yellow-900/10 border border-yellow-700/30">
-              <div className="text-3xl font-bold text-yellow-400">{tags.filter(t => t.status === 'assembled').length}</div>
+              <div className="text-3xl font-bold text-yellow-400">{workflowTags.filter(t => t.status === 'assembled').length}</div>
               <div className="text-xs text-[var(--c4)] mt-1">Assembled</div>
-            </div>
-            <div className="card text-center bg-green-900/10 border border-green-700/30">
-              <div className="text-3xl font-bold text-green-400">{tags.filter(t => t.status === 'shipped').length}</div>
-              <div className="text-xs text-[var(--c4)] mt-1">Shipped</div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left py-2 px-3">Tag Code</th>
-                  <th className="text-left py-2 px-3">Token ID</th>
-                  <th className="text-left py-2 px-3">Status</th>
-                  <th className="text-left py-2 px-3">Assembled</th>
-                  <th className="text-left py-2 px-3">Shipped</th>
-                  <th className="text-left py-2 px-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tags.map(tag => (
-                  <tr key={tag.id} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="py-2 px-3 font-mono font-bold">{tag.tag_code}</td>
-                    <td className="py-2 px-3 font-mono">{tag.token_id ? `#${tag.token_id}` : '—'}</td>
-                    <td className="py-2 px-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusBadge(tag.status)}`}>
-                        {tag.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-xs text-[var(--c4)]">
-                      {tag.assembled_at ? new Date(tag.assembled_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="py-2 px-3 text-xs text-[var(--c4)]">
-                      {tag.shipped_at ? new Date(tag.shipped_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="py-2 px-3">
-                      <div className="flex gap-2">
-                        {tag.status === 'on_chain_unclaimed' && (
-                          <button
-                            onClick={() => handleAction(tag.id, 'assemble')}
-                            disabled={actionLoading === tag.id + 'assemble'}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 text-white rounded text-xs font-semibold disabled:opacity-50"
-                          >
-                            {actionLoading === tag.id + 'assemble' ? '...' : '🔧 Assemble'}
-                          </button>
-                        )}
-                        {tag.status === 'assembled' && (
-                          <button
-                            onClick={() => handleAction(tag.id, 'ship')}
-                            disabled={actionLoading === tag.id + 'ship'}
-                            className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded text-xs font-semibold disabled:opacity-50"
-                          >
-                            {actionLoading === tag.id + 'ship' ? '...' : '🚚 Ship'}
-                          </button>
-                        )}
-                        {tag.status === 'shipped' && (
-                          <span className="text-green-400 text-xs">✅ Shipped</span>
-                        )}
+          {/* Workflow hint */}
+          <div className="mb-4 p-3 bg-[var(--bg-card)] border border-white/10 rounded-lg text-xs text-[var(--c4)]">
+            <span className="font-semibold text-white">Workflow:</span>
+            {' '}🖨️ Print QR label → 🔧 Mark Assembled → 📥 Push to Inventory
+          </div>
+
+          <div className="space-y-3">
+            {workflowTags.map(tag => {
+              const tokenCode = formatTokenCode(tag)
+              const hasPrinted = printed.has(tag.id)
+              const isAssembled = tag.status === 'assembled'
+
+              return (
+                <div key={tag.id} className="border border-white/10 rounded-lg p-4 bg-[var(--bg-card)]">
+                  <div className="flex items-start gap-4">
+                    {/* QR preview */}
+                    <div className="flex-shrink-0">
+                      <QRCodeDisplay
+                        url={tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`}
+                        size={80}
+                      />
+                    </div>
+
+                    {/* Tag info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono font-bold text-lg">{tag.tag_code}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusBadge(tag.status)}`}>
+                          {tag.status.replace(/_/g, ' ')}
+                        </span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <div className="font-mono text-xs text-[var(--c2)] mb-1">{tokenCode}</div>
+                      {tag.assembled_at && (
+                        <div className="text-xs text-[var(--c4)]">
+                          Assembled: {new Date(tag.assembled_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions — sequential workflow */}
+                    <div className="flex flex-col gap-2 items-end flex-shrink-0">
+                      {/* Step 1: Print (always available, required before Assemble) */}
+                      <button
+                        onClick={() => markPrinted(tag.id, tag)}
+                        className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 ${
+                          hasPrinted
+                            ? 'bg-green-900/30 border border-green-600 text-green-400'
+                            : 'bg-[var(--c2)] hover:opacity-80 text-white'
+                        }`}
+                      >
+                        {hasPrinted ? '✅ Printed' : '🖨️ Print QR'}
+                      </button>
+
+                      {/* Step 2: Assemble — only after printed, only when on_chain_unclaimed */}
+                      {!isAssembled && (
+                        <button
+                          onClick={() => handleAction(tag.id, 'assemble')}
+                          disabled={!hasPrinted || actionLoading === tag.id + 'assemble'}
+                          title={!hasPrinted ? 'Print the QR label first' : 'Mark as assembled'}
+                          className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {actionLoading === tag.id + 'assemble' ? '...' : '🔧 Assemble'}
+                        </button>
+                      )}
+
+                      {/* Step 3: Push to Inventory — only after assembled */}
+                      {isAssembled && (
+                        <button
+                          onClick={() => handleAction(tag.id, 'push_to_inventory')}
+                          disabled={actionLoading === tag.id + 'push_to_inventory'}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold disabled:opacity-50"
+                        >
+                          {actionLoading === tag.id + 'push_to_inventory' ? '...' : '📥 Push to Inventory'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </>
       )}
@@ -770,7 +842,7 @@ export default function SuperAdminPage() {
                                     Tag ID: {device.tag_code || device.tag_id}
                                   </div>
                                   <div className={`text-base font-bold ${device.token_id ? 'text-green-600' : 'text-yellow-600'}`}>
-                                    Token ID: {device.token_id ? `#${device.token_id}` : '❌ NOT READY'}
+                                    {device.token_id ? formatTokenCode(device) : '❌ NOT READY'}
                                   </div>
                                   <div className="text-sm text-gray-600">
                                     Animal ID: {device.public_id || 'Not attached'}
@@ -953,7 +1025,7 @@ export default function SuperAdminPage() {
                           <td className="py-2 px-3 font-mono font-semibold">{device.tag_code || device.tag_id}</td>
                           <td className="py-2 px-3">
                             {device.token_id ? (
-                              <span className="font-mono">#{device.token_id}</span>
+                              <span className="font-mono text-xs">{formatTokenCode(device)}</span>
                             ) : (
                               <span className="text-yellow-400">Pending</span>
                             )}
@@ -1088,7 +1160,7 @@ export default function SuperAdminPage() {
                             <div className="font-mono font-bold text-base border-b border-[var(--c2)] pb-1 mb-1">
                               {device.tag_code}
                             </div>
-                            <div className="text-green-400 text-xs font-semibold">Token #{device.token_id}</div>
+                            <div className="text-green-400 text-xs font-semibold font-mono">{formatTokenCode(device)}</div>
                             {device.public_id && <div className="text-xs text-[var(--c4)]">{device.public_id}</div>}
                           </div>
                           <div className="bg-white p-2 rounded flex justify-center">
