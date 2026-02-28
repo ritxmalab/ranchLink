@@ -276,7 +276,8 @@ export async function POST(request: NextRequest) {
       merkleProof = proofPart ? proofPart.split(',').filter(Boolean) as `0x${string}`[] : []
     }
 
-    if (isPre && batchIdHex && merkleProof.length > 0 && metadataCid) {
+    // merkleProof can be [] for a single-tag batch (valid empty proof)
+    if (isPre && batchIdHex && metadataCid) {
       try {
         const { lazyMintTag } = await import('@/lib/blockchain/ranchLinkTag1155')
         const result = await lazyMintTag(
