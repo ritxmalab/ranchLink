@@ -44,7 +44,8 @@ export async function GET(
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ tag: rows[0] })
+    const tag = rows[0]
+    return NextResponse.json({ tag })
   } catch (error: any) {
     console.error('Get tag error:', error)
     return NextResponse.json(
