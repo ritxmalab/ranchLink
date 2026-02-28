@@ -159,16 +159,12 @@ export async function POST(request: NextRequest) {
     mint_tx_hash: null,       // Set at lazy mint (claim time)
     batch_id: batch.id,
     ranch_id: targetRanchId || null,
-    status: 'pre_identity',   // New status: anchored but not yet claimed
+    status: 'pre_identity',   // Anchored on-chain, NFT mints at claim time
     activation_state: 'active',
-    // Store Merkle data for later proof verification
-    metadata: {
-      batch_id_hex: batchId,
-      merkle_root: merkleRoot,
-      merkle_proof: proofs[tagCode],
-      anchor_tx_hash: anchorTxHash,
-      batch_uri: batchURI,
-    },
+    // Merkle proof stored in mint_tx_hash as JSON string (no metadata column needed)
+    // Format: "PROOF:<batchIdHex>|<proof1>,<proof2>,..."
+    // This is decoded at attach time to reconstruct the proof
+    metadata_cid: `MERKLE:${batchId}|${(proofs[tagCode] || []).join(',')}`,
   }))
 
   // Insert in chunks of 100
@@ -203,10 +199,7 @@ export async function POST(request: NextRequest) {
   await fetch(`${supabaseUrl}/rest/v1/batches?id=eq.${batch.id}`, {
     method: 'PATCH',
     headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      status: 'ready_for_assembly',
-      metadata: { merkle_root: merkleRoot, anchor_tx_hash: anchorTxHash, batch_id_hex: batchId },
-    }),
+    body: JSON.stringify({ status: 'ready_for_assembly' }),
   })
 
   const duration = Date.now() - startTime

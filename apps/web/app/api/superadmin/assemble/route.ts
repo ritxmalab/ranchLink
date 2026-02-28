@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
   }
 
   const res = await fetch(
-    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id,metadata&order=created_at.desc`,
+    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id,metadata_cid&order=created_at.desc`,
     {
       headers: {
         'apikey': serviceKey,

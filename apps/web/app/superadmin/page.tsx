@@ -566,7 +566,7 @@ export default function SuperAdminPage() {
   const getOnChainStatus = (device: Device): 'on-chain' | 'anchored' | 'off-chain' | 'error' => {
     if (device.token_id && device.contract_address) {
       return 'on-chain'  // ERC-721 or lazy-minted ERC-1155
-    } else if ((device as any).status === 'pre_identity' || (device as any).metadata?.anchor_tx_hash) {
+    } else if ((device as any).status === 'pre_identity' || ((device as any).metadata_cid || '').startsWith('MERKLE:')) {
       return 'anchored'  // Merkle-anchored, not yet lazy-minted
     } else if (!device.token_id) {
       return 'off-chain'

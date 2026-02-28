@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     // 1. Load tag — must exist and be on-chain
     const { data: tag, error: tagError } = await supabase
       .from('tags')
-      .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash, metadata')
+      .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash, metadata_cid')
       .eq('tag_code', tagCode)
       .single()
 
@@ -260,15 +260,24 @@ export async function POST(request: NextRequest) {
     //    For legacy ERC-721 tags (already have token_id), just update CID.
     //    For new pre_identity tags, mint the ERC-1155 token now.
     const isPre = tag.status === 'pre_identity' || !tag.token_id
-    const tagMeta = (tag as any).metadata || {}
 
-    if (isPre && tagMeta.batch_id_hex && tagMeta.merkle_proof && metadataCid) {
+    // Decode Merkle proof stored in metadata_cid as "MERKLE:<batchIdHex>|<proof1>,<proof2>,..."
+    let batchIdHex: `0x${string}` | null = null
+    let merkleProof: `0x${string}`[] = []
+    const metaCid: string = (tag as any).metadata_cid || ''
+    if (metaCid.startsWith('MERKLE:')) {
+      const [batchPart, proofPart] = metaCid.slice(7).split('|')
+      batchIdHex = batchPart as `0x${string}`
+      merkleProof = proofPart ? proofPart.split(',').filter(Boolean) as `0x${string}`[] : []
+    }
+
+    if (isPre && batchIdHex && merkleProof.length > 0 && metadataCid) {
       try {
         const { lazyMintTag } = await import('@/lib/blockchain/ranchLinkTag1155')
         const result = await lazyMintTag(
           tagCode,
-          tagMeta.batch_id_hex as `0x${string}`,
-          tagMeta.merkle_proof as `0x${string}`[],
+          batchIdHex,
+          merkleProof,
           metadataCid
         )
         tokenId = result.tokenId.toString()
