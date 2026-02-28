@@ -4,6 +4,9 @@ import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 import { z } from 'zod'
 import { keccak256, encodePacked } from 'viem'
 
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // blockchain tx receipt can take 5-30s on Base
+
 const batchSchema = z.object({
   batchName: z.string().min(1).max(100),
   batchSize: z.number().int().min(1).max(10000),

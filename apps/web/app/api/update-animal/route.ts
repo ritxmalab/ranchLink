@@ -3,6 +3,8 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
+export const maxDuration = 60 // setCID on-chain call can take 10-30s
+
 export const dynamic = 'force-dynamic'
 
 const updateSchema = z.object({

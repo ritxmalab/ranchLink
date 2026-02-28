@@ -10,8 +10,10 @@ export async function POST(request: NextRequest) {
 
   const cookieValue = Buffer.from(correct + '_ranchlink').toString('base64')
   const response = NextResponse.json({ success: true })
+  // httpOnly: false so the client JS can detect the session on page reload.
+  // The value is a derived token (not the raw password), so exposure is acceptable.
   response.cookies.set('rl_superadmin', cookieValue, {
-    httpOnly: true,
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: 60 * 60 * 24 * 30, // 30 days

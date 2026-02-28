@@ -52,7 +52,7 @@ export async function anchorBatch(
     args: [batchId, merkleRoot, batchURI],
   })
 
-  await publicClient.waitForTransactionReceipt({ hash })
+  await publicClient.waitForTransactionReceipt({ hash, timeout: 50_000 })
   return hash
 }
 
@@ -111,7 +111,7 @@ export async function setCID1155(tokenId: bigint, cid: string): Promise<string> 
     args: [tokenId, cid],
   })
 
-  await publicClient.waitForTransactionReceipt({ hash })
+  await publicClient.waitForTransactionReceipt({ hash, timeout: 50_000 })
   return hash
 }
 

@@ -183,7 +183,7 @@ function AssembleTab() {
 
   const fetchAssembleTags = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/superadmin/assemble')
+    const res = await fetch('/api/superadmin/assemble', { credentials: 'include' })
     const data = await res.json()
     setTags(data.tags || [])
     setLoading(false)
@@ -195,6 +195,7 @@ function AssembleTab() {
     setActionLoading(tagId + action)
     await fetch('/api/superadmin/assemble', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag_id: tagId, action, assembled_by: 'superadmin' }),
     })
@@ -427,7 +428,7 @@ export default function SuperAdminPage() {
     setIsLoadingDevices(true)
     setErrorMessage(null)
     try {
-      const response = await fetch('/api/superadmin/devices')
+      const response = await fetch('/api/superadmin/devices', { credentials: 'include' })
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Failed to load devices')
@@ -441,9 +442,11 @@ export default function SuperAdminPage() {
     }
   }, [])
 
-  // Check cookie auth on mount
+  // Check cookie auth on mount — use exact key match (cookie is not httpOnly)
   useEffect(() => {
-    const hasCookie = document.cookie.includes('rl_superadmin')
+    const hasCookie = document.cookie
+      .split(';')
+      .some(c => c.trim().startsWith('rl_superadmin=') && c.trim().split('=')[1]?.trim().length > 0)
     setAuthed(hasCookie)
   }, [])
 
@@ -471,6 +474,7 @@ export default function SuperAdminPage() {
       // Call v1.0 factory endpoint
       const response = await fetch('/api/factory/batches', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           batchName: batchName || `Batch ${new Date().toISOString().slice(0, 10)}`,
@@ -1131,6 +1135,7 @@ export default function SuperAdminPage() {
                                     try {
                                       const syncResponse = await fetch('/api/sync-tag', {
                                         method: 'POST',
+                                        credentials: 'include',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ tagCode: device.tag_code }),
                                       })
@@ -1148,6 +1153,7 @@ export default function SuperAdminPage() {
                                       button.textContent = '⏳ Minting...'
                                       const response = await fetch('/api/retry-mint', {
                                         method: 'POST',
+                                        credentials: 'include',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ tagCode: device.tag_code }),
                                       })
@@ -1219,6 +1225,7 @@ export default function SuperAdminPage() {
                                     if (!confirm(`${labels[action] || action} for ${device.tag_code}?`)) return
                                     await fetch('/api/superadmin/assemble', {
                                       method: 'POST',
+                                      credentials: 'include',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({ tag_id: device.id, action }),
                                     })

@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // lazy ERC-1155 mint + IPFS pin can take 20-40s
 
 const attachTagSchema = z.object({
   tagCode: z.string().min(1).max(20),
