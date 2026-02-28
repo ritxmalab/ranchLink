@@ -54,6 +54,7 @@ export default function TagScanPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
   const [attachSuccess, setAttachSuccess] = useState(false)
+  const [mintingStep, setMintingStep] = useState(0) // 0=idle, 1=saving, 2=ipfs, 3=blockchain, 4=done
 
   // BASIC
   const [animalName, setAnimalName] = useState('')
@@ -136,22 +137,24 @@ export default function TagScanPage({ params }: PageProps) {
   const handleAttach = async (e: React.FormEvent) => {
     e.preventDefault()
     setAttaching(true)
+    setMintingStep(1)
     setError(null)
 
     try {
-      // Step 1: Upload photo to IPFS if provided (before attach so we have the URL)
+      // Step 1: Upload photo if provided
       let photoUrl: string | undefined
       if (photoFile) {
         setPhotoUploading(true)
+        setMintingStep(1)
         const photoForm = new FormData()
         photoForm.append('file', photoFile)
         const photoRes = await fetch('/api/upload-photo', { method: 'POST', body: photoForm })
         const photoData = await photoRes.json()
-        if (photoRes.ok && photoData.photo_url) {
-          photoUrl = photoData.photo_url
-        }
+        if (photoRes.ok && photoData.photo_url) photoUrl = photoData.photo_url
         setPhotoUploading(false)
       }
+
+      setMintingStep(2) // Pinning to IPFS
 
       const response = await fetch('/api/attach-tag', {
         method: 'POST',
@@ -159,33 +162,21 @@ export default function TagScanPage({ params }: PageProps) {
         body: JSON.stringify({
           tagCode: tag_code,
           animalData: {
-            // BASIC
-            name: animalName,
-            species,
-            breed: breed || undefined,
-            birth_year: birthYear || undefined,
-            sex: sex || undefined,
-            size: size || undefined,
-            // IDENTIFICATION
-            eid: eid || undefined,
-            secondary_id: secondaryId || undefined,
-            tattoo: tattoo || undefined,
-            brand: brand || undefined,
-            // ADDITIONAL
+            name: animalName, species,
+            breed: breed || undefined, birth_year: birthYear || undefined,
+            sex: sex || undefined, size: size || undefined,
+            eid: eid || undefined, secondary_id: secondaryId || undefined,
+            tattoo: tattoo || undefined, brand: brand || undefined,
             owner: owner || undefined,
             head_count: headCount ? parseInt(headCount) : undefined,
             labels: labels ? labels.split(',').map((l) => l.trim()).filter(Boolean) : undefined,
-            // CALLFHOOD
-            dam_id: damId || undefined,
-            sire_id: sireId || undefined,
+            dam_id: damId || undefined, sire_id: sireId || undefined,
             birth_weight: birthWeight ? parseFloat(birthWeight) : undefined,
             weaning_weight: weaningWeight ? parseFloat(weaningWeight) : undefined,
             weaning_date: weaningDate || undefined,
             yearling_weight: yearlingWeight ? parseFloat(yearlingWeight) : undefined,
             yearling_date: yearlingDate || undefined,
-            // PHOTO
             photo_url: photoUrl || undefined,
-            // PURCHASE
             seller: seller || undefined,
             purchase_price: purchasePrice ? parseFloat(purchasePrice) : undefined,
             purchase_date: purchaseDate || undefined,
@@ -193,19 +184,22 @@ export default function TagScanPage({ params }: PageProps) {
         }),
       })
 
+      setMintingStep(3) // Minting on blockchain
+
       const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to attach tag')
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to attach tag')
-      }
-
+      setMintingStep(4) // Done
       setAttachSuccess(true)
+
+      // Give the user 3 seconds to see the success screen before redirecting
       setTimeout(() => {
         router.push(`/a/${data.public_id}`)
-      }, 1000)
+      }, 3000)
     } catch (err: any) {
       console.error('Attach error:', err)
       setError(err.message || 'Failed to attach tag')
+      setMintingStep(0)
     } finally {
       setAttaching(false)
     }
@@ -235,6 +229,135 @@ export default function TagScanPage({ params }: PageProps) {
   }
 
   if (!tag) return null
+
+  // ── Full-screen minting overlay ──────────────────────────────────────────
+  if (mintingStep > 0) {
+    const steps = [
+      { label: 'Saving animal data', icon: '💾' },
+      { label: 'Pinning to IPFS', icon: '📌' },
+      { label: 'Tokenizing on Base blockchain', icon: '⛓️' },
+      { label: 'Your animal is on-chain!', icon: '🎉' },
+    ]
+    const isDone = mintingStep === 4
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-sky-900 via-blue-950 to-[var(--bg)] overflow-hidden relative px-4">
+
+        {/* Animated clouds */}
+        <style>{`
+          @keyframes cloud1 { 0%{transform:translateX(-120px)} 100%{transform:translateX(calc(100vw + 120px))} }
+          @keyframes cloud2 { 0%{transform:translateX(-200px)} 100%{transform:translateX(calc(100vw + 200px))} }
+          @keyframes cloud3 { 0%{transform:translateX(-160px)} 100%{transform:translateX(calc(100vw + 160px))} }
+          @keyframes flyAcross { 0%{transform:translateX(-140px) translateY(0px) scaleX(1)} 40%{transform:translateX(35vw) translateY(-18px) scaleX(1)} 60%{transform:translateX(55vw) translateY(-8px) scaleX(1)} 100%{transform:translateX(calc(100vw + 140px)) translateY(0px) scaleX(1)} }
+          @keyframes flyDone { 0%{transform:translateX(-140px) translateY(0px)} 100%{transform:translateX(calc(50vw - 60px)) translateY(-10px)} }
+          @keyframes bobble { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-12px)} }
+          @keyframes fadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+          @keyframes progressFill { from{width:0%} to{width:var(--target-w)} }
+          @keyframes sparkle { 0%,100%{opacity:0;transform:scale(0.5)} 50%{opacity:1;transform:scale(1.2)} }
+          .cloud { position:absolute; border-radius:50px; background:rgba(255,255,255,0.18); }
+          .cloud::before,.cloud::after { content:''; position:absolute; background:rgba(255,255,255,0.18); border-radius:50%; }
+        `}</style>
+
+        {/* Cloud layer */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="cloud" style={{width:180,height:50,top:'18%',animation:'cloud1 8s linear infinite',animationDelay:'-2s'}}>
+            <div style={{position:'absolute',width:80,height:80,background:'rgba(255,255,255,0.15)',borderRadius:'50%',top:-35,left:20}}/>
+            <div style={{position:'absolute',width:60,height:60,background:'rgba(255,255,255,0.12)',borderRadius:'50%',top:-25,left:80}}/>
+          </div>
+          <div className="cloud" style={{width:140,height:40,top:'32%',animation:'cloud2 12s linear infinite',animationDelay:'-5s'}}>
+            <div style={{position:'absolute',width:60,height:60,background:'rgba(255,255,255,0.13)',borderRadius:'50%',top:-28,left:15}}/>
+            <div style={{position:'absolute',width:50,height:50,background:'rgba(255,255,255,0.1)',borderRadius:'50%',top:-20,left:65}}/>
+          </div>
+          <div className="cloud" style={{width:220,height:55,top:'55%',animation:'cloud3 10s linear infinite',animationDelay:'-1s'}}>
+            <div style={{position:'absolute',width:90,height:90,background:'rgba(255,255,255,0.14)',borderRadius:'50%',top:-40,left:30}}/>
+            <div style={{position:'absolute',width:70,height:70,background:'rgba(255,255,255,0.11)',borderRadius:'50%',top:-30,left:110}}/>
+          </div>
+        </div>
+
+        {/* Flying cow */}
+        <div
+          className="absolute"
+          style={{
+            top: '30%',
+            fontSize: 72,
+            animation: isDone
+              ? 'bobble 1.4s ease-in-out infinite'
+              : 'flyAcross 3.6s cubic-bezier(0.4,0,0.6,1) infinite',
+            zIndex: 10,
+            filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.4))',
+            ...(isDone ? { position: 'relative', top: 'auto' } : {}),
+          }}
+        >
+          🐄
+        </div>
+
+        {/* Content card */}
+        <div className="relative z-20 text-center max-w-sm w-full mt-32">
+
+          {isDone ? (
+            <div style={{animation:'fadeIn 0.5s ease-out'}}>
+              <div className="text-6xl mb-4" style={{animation:'bobble 1.2s ease-in-out infinite'}}>🎉</div>
+              <h2 className="text-3xl font-bold text-white mb-2">Animal Registered!</h2>
+              <p className="text-sky-300 mb-6">Your livestock is now a verified on-chain asset on Base.</p>
+              <div className="flex gap-2 justify-center mb-6">
+                {['⚡','🔗','✅'].map((s,i) => (
+                  <span key={i} style={{fontSize:24,animation:`sparkle 1s ease-in-out infinite`,animationDelay:`${i*0.3}s`}}>{s}</span>
+                ))}
+              </div>
+              <p className="text-sky-400 text-sm">Taking you to your animal card...</p>
+            </div>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-2">Tokenizing RWA</h2>
+              <p className="text-sky-300 text-sm mb-8">Registering your animal on the blockchain — hold on!</p>
+
+              {/* Step list */}
+              <div className="space-y-3 mb-8 text-left">
+                {steps.map((step, idx) => {
+                  const stepNum = idx + 1
+                  const done = mintingStep > stepNum
+                  const active = mintingStep === stepNum
+                  return (
+                    <div key={idx} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-500 ${
+                      done ? 'bg-green-900/40 border border-green-700/50'
+                      : active ? 'bg-blue-900/50 border border-blue-500/60 shadow-lg shadow-blue-900/30'
+                      : 'bg-white/5 border border-white/10 opacity-40'
+                    }`}>
+                      <span className="text-xl">
+                        {done ? '✅' : active ? (
+                          <span style={{display:'inline-block',animation:'bobble 0.8s ease-in-out infinite'}}>{step.icon}</span>
+                        ) : step.icon}
+                      </span>
+                      <span className={`text-sm font-medium ${done ? 'text-green-300' : active ? 'text-white' : 'text-gray-500'}`}>
+                        {step.label}
+                      </span>
+                      {active && (
+                        <span className="ml-auto flex gap-1">
+                          {[0,1,2].map(i => (
+                            <span key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                              style={{animation:`sparkle 1s ease-in-out infinite`,animationDelay:`${i*0.2}s`}}/>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700 ease-out"
+                  style={{ width: `${Math.min(((mintingStep - 1) / 3) * 100, 90)}%` }}
+                />
+              </div>
+              <p className="text-sky-500 text-xs mt-2">{Math.round(Math.min(((mintingStep - 1) / 3) * 100, 90))}% complete</p>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const basescanUrl = tag.token_id ? getBasescanUrl(BigInt(tag.token_id)) : null
   // pre_identity = Merkle-anchored ERC-1155 tag — valid for attachment (lazy mints at claim)
@@ -316,11 +439,7 @@ export default function TagScanPage({ params }: PageProps) {
               </div>
             )}
 
-            {attachSuccess && (
-              <div className="mb-4 p-4 bg-green-900/20 border border-green-700/50 rounded-lg">
-                <p className="text-green-400 font-semibold">✅ Tag attached successfully! Redirecting...</p>
-              </div>
-            )}
+            {/* Success state is handled by the full-screen minting overlay above */}
 
             {error && (
               <div className="mb-4 p-4 bg-red-900/20 border border-red-700/50 rounded-lg">
@@ -545,7 +664,7 @@ export default function TagScanPage({ params }: PageProps) {
                   disabled={attaching || !animalName || !species || onChainStatus === 'off-chain'}
                   // anchored and on-chain are both valid — only off-chain blocks submission
                 >
-                  {photoUploading ? '📷 Uploading photo...' : attaching ? '⛓️ Saving & minting...' : '🐄 Attach Animal'}
+                  {attaching ? '⛓️ Processing...' : '🐄 Attach Animal'}
                 </button>
               </div>
             </form>
