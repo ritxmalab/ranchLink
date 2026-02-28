@@ -19,16 +19,28 @@ export default function StartPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Check if token looks like a tag_code (RL-XXX format)
-  const isTagCode = (token: string) => {
-    return /^RL-\d+$/i.test(token.trim())
+  // Extract tag code from any input format:
+  //   RL-029              → RL-029  (plain tag code)
+  //   RL-029-A3F2B1C4     → RL-029  (token code from sticker)
+  //   RL-029-T12345       → RL-029  (token id format)
+  //   https://.../t/RL-029 → RL-029 (full URL)
+  const extractTagCode = (token: string): string | null => {
+    const t = token.trim()
+    // Full URL
+    const urlMatch = t.match(/\/t\/(RL-\d+)/i)
+    if (urlMatch) return urlMatch[1].toUpperCase()
+    // Token code: RL-029-XXXXXXXX or RL-029-TXXXXX
+    const tokenMatch = t.match(/^(RL-\d+)-/i)
+    if (tokenMatch) return tokenMatch[1].toUpperCase()
+    // Plain tag code
+    if (/^RL-\d+$/i.test(t)) return t.toUpperCase()
+    return null
   }
 
-  // Auto-redirect if token is a tag_code (v1.0 flow)
+  // Auto-redirect as soon as a valid code is detected
   useEffect(() => {
-    if (formData.token && isTagCode(formData.token)) {
-      router.push(`/t/${formData.token.trim().toUpperCase()}`)
-    }
+    const code = extractTagCode(formData.token)
+    if (code) router.push(`/t/${code}`)
   }, [formData.token, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,9 +48,9 @@ export default function StartPage() {
     setLoading(true)
     setError(null)
 
-    // v1.0: If token looks like a tag_code (RL-XXX), redirect to v1.0 flow IMMEDIATELY
-    if (isTagCode(formData.token)) {
-      router.push(`/t/${formData.token.trim().toUpperCase()}`)
+    const code = extractTagCode(formData.token)
+    if (code) {
+      router.push(`/t/${code}`)
       return
     }
 
@@ -119,12 +131,12 @@ export default function StartPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, token: e.target.value })
                     }
-                    placeholder="Scan QR code or enter token"
+                    placeholder="e.g. RL-029 or RL-029-A3F2B1C4"
                     className="w-full px-4 py-3 bg-[var(--bg-card)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none text-[var(--c1)] placeholder:text-[var(--c4)]"
                     required
                   />
                   <p className="text-sm text-[var(--c4)] mt-2">
-                    Scan the QR code on your tag, or enter the tag code (e.g., RL-001)
+                    Scan the QR on your tag, or type the token code printed on the sticker (e.g. <span className="font-mono text-white">RL-029-A3F2B1C4</span>)
                   </p>
                   {error && (
                     <div className="mt-2 p-3 bg-red-900/20 border border-red-700/50 rounded text-red-400 text-sm">
@@ -277,7 +289,7 @@ export default function StartPage() {
                     className="btn-primary flex-1"
                     disabled={loading || !formData.token}
                   >
-                    {loading ? 'Processing...' : isTagCode(formData.token) ? 'Continue to Tag' : 'Claim Tag'}
+                    {loading ? 'Processing...' : extractTagCode(formData.token) ? 'Continue to Tag' : 'Claim Tag'}
                   </button>
                 </div>
               </div>

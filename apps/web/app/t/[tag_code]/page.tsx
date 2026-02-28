@@ -102,10 +102,13 @@ export default function TagScanPage({ params }: PageProps) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' })
         if (code?.data) {
-          const match = code.data.match(/\/t\/(RL-\d+)/i)
-          if (match) {
+          // Accept full URL, plain tag code, or token code (RL-029-XXXXXXXX)
+          const urlMatch = code.data.match(/\/t\/(RL-\d+)/i)
+          const tokenMatch = code.data.match(/^(RL-\d+)(?:-|$)/i)
+          const tagCode = urlMatch?.[1] || tokenMatch?.[1]
+          if (tagCode) {
             stopScanner(); setScannerOpen(false)
-            router.push('/t/' + match[1].toUpperCase()); return
+            router.push('/t/' + tagCode.toUpperCase()); return
           }
         }
         rafRef.current = requestAnimationFrame(scan)

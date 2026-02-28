@@ -129,18 +129,23 @@ function formatTokenCode(tag: { tag_code?: string; token_id?: string | null; min
 
 // ── QR sticker HTML builder ────────────────────────────────────────────────────
 // Renders a single 30×30mm sticker cell. Used by both single and batch print.
+// Bottom line = token code (manual claim fallback), black, bold — replaces grey URL.
 function stickerHTML(tag: any): string {
   const url = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(url)}`
   const batchLabel = tag.batch_name || ''
   const specLine = [tag.color, tag.material?.split(' ')[0]].filter(Boolean).join(' · ')
+  // Token code = manual claim ID. Format: RL-029-A3F2B1C4 (from tx hash) or RL-029-T<tokenId>.
+  // For pre_identity tags (not yet minted), just use the tag code — farmer types this to claim.
+  const tokenCode = formatTokenCode(tag)
+  const claimCode = tokenCode !== '—' ? tokenCode : tag.tag_code
   return `
     <div class="sticker">
       <div class="tag-code">${tag.tag_code}</div>
       ${batchLabel ? `<div class="batch-name">${batchLabel}</div>` : ''}
       ${specLine ? `<div class="spec-line">${specLine}</div>` : ''}
       <img src="${qrSrc}" />
-      <div class="url">${url.replace('https://', '')}</div>
+      <div class="claim-code">${claimCode}</div>
     </div>`
 }
 
@@ -164,8 +169,9 @@ const STICKER_CSS = `
   .batch-name { font-size: 4.5pt; color: #333; margin-bottom: 0.3mm; letter-spacing: 0.2px; }
   .spec-line  { font-size: 4pt; color: #888; margin-bottom: 0.5mm; }
   img { width: 22mm; height: 22mm; display: block; }
-  .url { font-size: 3.5pt; color: #999; margin-top: 0.3mm; text-align: center;
-         max-width: 28mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .claim-code { font-size: 4pt; color: #000; font-weight: bold; margin-top: 0.4mm;
+                text-align: center; max-width: 28mm; overflow: hidden;
+                white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.3px; }
 `
 
 // ── Individual QR print ────────────────────────────────────────────────────────
