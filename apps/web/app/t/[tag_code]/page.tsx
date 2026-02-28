@@ -54,7 +54,8 @@ export default function TagScanPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
   const [attachSuccess, setAttachSuccess] = useState(false)
-  const [mintingStep, setMintingStep] = useState(0) // 0=idle, 1=saving, 2=ipfs, 3=blockchain, 4=done
+  const [mintingStep, setMintingStep] = useState(0) // 0=idle, 1=saving, 2=ipfs, 3=blockchain, 4=done, -1=error
+  const [mintingError, setMintingError] = useState<{ message: string; code: string; step: string } | null>(null)
 
   // BASIC
   const [animalName, setAnimalName] = useState('')
@@ -198,8 +199,21 @@ export default function TagScanPage({ params }: PageProps) {
       }, 3000)
     } catch (err: any) {
       console.error('Attach error:', err)
-      setError(err.message || 'Failed to attach tag')
-      setMintingStep(0)
+      const stepNames = ['', 'Saving data', 'Pinning to IPFS', 'Blockchain mint', 'Finalizing']
+      const failedAt = mintingStep > 0 ? stepNames[mintingStep] || 'Processing' : 'Processing'
+      const rawMsg: string = err.message || 'Unknown error'
+      // Extract a short error code from the message for display
+      const code = rawMsg.includes('MINTER') ? 'ERR_MINTER_ROLE'
+        : rawMsg.includes('balance') || rawMsg.includes('funds') ? 'ERR_INSUFFICIENT_FUNDS'
+        : rawMsg.includes('network') || rawMsg.includes('fetch') ? 'ERR_NETWORK'
+        : rawMsg.includes('proof') || rawMsg.includes('Merkle') ? 'ERR_MERKLE_PROOF'
+        : rawMsg.includes('IPFS') || rawMsg.includes('Pinata') ? 'ERR_IPFS_PIN'
+        : rawMsg.includes('already') ? 'ERR_ALREADY_ATTACHED'
+        : rawMsg.includes('not found') || rawMsg.includes('404') ? 'ERR_TAG_NOT_FOUND'
+        : `ERR_${Date.now().toString(36).toUpperCase()}`
+      setMintingError({ message: rawMsg, code, step: failedAt })
+      setMintingStep(-1)
+      setError(rawMsg)
     } finally {
       setAttaching(false)
     }
@@ -231,7 +245,7 @@ export default function TagScanPage({ params }: PageProps) {
   if (!tag) return null
 
   // ── Full-screen minting overlay ──────────────────────────────────────────
-  if (mintingStep > 0) {
+  if (mintingStep !== 0) {
     const steps = [
       { label: 'Saving animal data', icon: '💾' },
       { label: 'Pinning to IPFS', icon: '📌' },
@@ -239,6 +253,7 @@ export default function TagScanPage({ params }: PageProps) {
       { label: 'Your animal is on-chain!', icon: '🎉' },
     ]
     const isDone = mintingStep === 4
+    const isError = mintingStep === -1
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-sky-900 via-blue-950 to-[var(--bg)] overflow-hidden relative px-4">
@@ -294,7 +309,55 @@ export default function TagScanPage({ params }: PageProps) {
         {/* Content card */}
         <div className="relative z-20 text-center max-w-sm w-full mt-32">
 
-          {isDone ? (
+          {isError ? (
+            <div style={{animation:'fadeIn 0.4s ease-out'}}>
+              <div className="text-5xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-white mb-1">Something went wrong</h2>
+              <p className="text-red-300 text-sm mb-5">
+                Failed during: <span className="font-semibold text-red-200">{mintingError?.step}</span>
+              </p>
+
+              {/* Error code badge */}
+              <div className="inline-flex items-center gap-2 bg-red-950/60 border border-red-700/50 rounded-lg px-4 py-2 mb-4">
+                <span className="text-red-400 text-xs font-mono tracking-wider">{mintingError?.code}</span>
+              </div>
+
+              {/* Error message */}
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-6 text-left">
+                <p className="text-gray-400 text-xs font-mono leading-relaxed break-words">
+                  {mintingError?.message}
+                </p>
+              </div>
+
+              <p className="text-sky-400 text-sm mb-6">
+                Your animal data was <span className="text-green-400 font-semibold">saved</span> — only the blockchain step may need to be retried.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setMintingStep(0)
+                    setMintingError(null)
+                    setError(null)
+                  }}
+                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
+                >
+                  ↩ Try Again
+                </button>
+                <button
+                  onClick={() => {
+                    // Copy error code to clipboard
+                    navigator.clipboard?.writeText(`${mintingError?.code}: ${mintingError?.message}`)
+                      .then(() => alert('Error copied to clipboard'))
+                      .catch(() => {})
+                  }}
+                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 text-sm transition-colors border border-white/10"
+                >
+                  📋 Copy error for support
+                </button>
+              </div>
+            </div>
+          ) : isDone ? (
             <div style={{animation:'fadeIn 0.5s ease-out'}}>
               <div className="text-6xl mb-4" style={{animation:'bobble 1.2s ease-in-out infinite'}}>🎉</div>
               <h2 className="text-3xl font-bold text-white mb-2">Animal Registered!</h2>
