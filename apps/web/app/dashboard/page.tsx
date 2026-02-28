@@ -13,6 +13,7 @@ interface Animal {
   sex: string | null
   birth_year: number | null
   status: string
+  photo_url?: string | null
   tags?: Array<{
     tag_code: string
     token_id: string | null
@@ -316,9 +317,13 @@ export default function DashboardPage() {
                           <h3 className="text-xl font-bold mb-1">{animal.name}</h3>
                           <p className="text-sm text-[var(--c4)] font-mono">{animal.public_id}</p>
                         </div>
-                        <div className="w-16 h-16 bg-gradient-to-br from-[var(--c2)] to-[var(--c3)] rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                          {(animal.name || 'A').charAt(0).toUpperCase()}
-                        </div>
+                        {animal.photo_url ? (
+                          <img src={animal.photo_url} alt={animal.name} className="w-16 h-16 rounded-full object-cover border-2 border-[var(--c2)]" />
+                        ) : (
+                          <div className="w-16 h-16 bg-gradient-to-br from-[var(--c2)] to-[var(--c3)] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                            {(animal.name || 'A').charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-2 mb-4">

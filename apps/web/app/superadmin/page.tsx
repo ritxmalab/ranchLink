@@ -334,7 +334,7 @@ function AssembleTab() {
           {(() => {
             const batches: Record<string, typeof workflowTags> = {}
             workflowTags.forEach(t => {
-              const key = t.batch_name || 'Unnamed'
+              const key = t.batch_name || 'Legacy (no batch)'
               if (!batches[key]) batches[key] = []
               batches[key].push(t)
             })
@@ -1362,6 +1362,19 @@ export default function SuperAdminPage() {
                               >
                                 🖨️
                               </button>
+
+                              {/* Edit Animal — only for attached tags with a public_id */}
+                              {device.public_id && (
+                                <a
+                                  href={`/a/${device.public_id}?superadmin=1`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] hover:text-white rounded text-xs"
+                                  title={`Edit animal ${device.public_id}`}
+                                >
+                                  ✏️
+                                </a>
+                              )}
 
                               {/* Status transition dropdown — shown for in_inventory, demo, for_sale */}
                               {['in_inventory', 'demo', 'for_sale', 'assembled'].includes(device.status) && (

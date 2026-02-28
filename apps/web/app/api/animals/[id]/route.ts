@@ -15,6 +15,7 @@ export async function GET(
       .from('animals')
       .select(`
         *,
+        photo_url,
         tags (
           tag_code,
           token_id,
@@ -22,7 +23,8 @@ export async function GET(
           chain,
           contract_address,
           status,
-          activation_state
+          activation_state,
+          claim_token
         ),
         ranches (
           id,

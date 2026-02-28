@@ -84,6 +84,7 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [isSuperadminView, setIsSuperadminView] = useState(false)
 
   // Update form state
   const [showUpdateForm, setShowUpdateForm] = useState(false)
@@ -99,6 +100,10 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
     fetchAnimal()
     // Check owner cookie client-side (set at attach time)
     setIsOwner(!!getOwnerCookie(public_id))
+    // Check if opened from superadmin (?superadmin=1) — grants edit access
+    const params = new URLSearchParams(window.location.search)
+    const hasSuperadminCookie = document.cookie.split(';').some(c => c.trim().startsWith('rl_superadmin=') && c.trim().split('=')[1]?.trim().length > 0)
+    setIsSuperadminView(params.get('superadmin') === '1' && hasSuperadminCookie)
   }, [public_id])
 
   const fetchAnimal = async () => {
@@ -163,6 +168,7 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
       const res = await fetch('/api/update-animal', {
         method: 'POST',
+        credentials: 'include', // sends rl_superadmin cookie for superadmin bypass
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
@@ -380,13 +386,20 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
         {/* Actions */}
         <div className="flex gap-3 mt-4 flex-wrap">
-          {isOwner ? (
-            <button
-              onClick={() => setShowUpdateForm(!showUpdateForm)}
-              className="btn-primary"
-            >
-              {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
-            </button>
+          {(isOwner || isSuperadminView) ? (
+            <>
+              <button
+                onClick={() => setShowUpdateForm(!showUpdateForm)}
+                className="btn-primary"
+              >
+                {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
+              </button>
+              {isSuperadminView && (
+                <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-700/30 rounded-lg px-3 py-2">
+                  🛡️ Superadmin edit mode
+                </span>
+              )}
+            </>
           ) : (
             <div className="flex items-center gap-2 text-sm text-[var(--c4)] bg-white/5 border border-white/10 rounded-lg px-3 py-2">
               <span>🔒</span>
@@ -398,8 +411,8 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
           </button>
         </div>
 
-        {/* Ongoing Update Form — owner only */}
-        {isOwner && showUpdateForm && (
+        {/* Ongoing Update Form — owner or superadmin */}
+        {(isOwner || isSuperadminView) && showUpdateForm && (
           <div className="mt-4 card border-2 border-[var(--c2)]/40 bg-gradient-to-br from-blue-900/10 to-purple-900/10">
             <h3 className="text-xl font-bold mb-4">📝 Log Update</h3>
             <form onSubmit={handleUpdate} className="space-y-4">
