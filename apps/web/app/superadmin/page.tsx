@@ -127,52 +127,85 @@ function formatTokenCode(tag: { tag_code?: string; token_id?: string | null; min
   return '—'
 }
 
-// ── Individual QR print — isolated 30 mm sticker ─────────────────────────────
-// Opens a new window sized exactly to the sticker, auto-prints, then closes.
-function printSingleQR(tag: any) {
+// ── QR sticker HTML builder ────────────────────────────────────────────────────
+// Renders a single 30×30mm sticker cell. Used by both single and batch print.
+function stickerHTML(tag: any): string {
   const url = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(url)}`
-  // Batch name shown on label (e.g. TST_ATX_270226) — falls back to tag code
-  const batchLabel = tag.batch_name || tag.tag_code
-  // Material spec line — e.g. "Yellow · PETG-HF"
+  const batchLabel = tag.batch_name || ''
   const specLine = [tag.color, tag.material?.split(' ')[0]].filter(Boolean).join(' · ')
-  const win = window.open('', '_blank', 'width=300,height=340')
-  if (!win) { alert('Allow pop-ups to print QR labels.'); return }
-  win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>QR ${tag.tag_code}</title>
-<style>
-  @page { size: 30mm 30mm; margin: 0; }
+  return `
+    <div class="sticker">
+      <div class="tag-code">${tag.tag_code}</div>
+      ${batchLabel ? `<div class="batch-name">${batchLabel}</div>` : ''}
+      ${specLine ? `<div class="spec-line">${specLine}</div>` : ''}
+      <img src="${qrSrc}" />
+      <div class="url">${url.replace('https://', '')}</div>
+    </div>`
+}
+
+// Shared CSS for sticker layout — works centered on any paper size
+const STICKER_CSS = `
+  @page { margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
+  body { font-family: monospace; background: #fff; }
+  .grid {
+    display: flex; flex-wrap: wrap; gap: 4mm;
+    justify-content: flex-start; align-items: flex-start;
+  }
+  .sticker {
     width: 30mm; height: 30mm;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    font-family: monospace; background: #fff;
-    overflow: hidden;
+    border: 0.3mm dashed #ccc;
+    overflow: hidden; page-break-inside: avoid;
   }
-  .tag-code  { font-size: 6.5pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
-  .batch-name { font-size: 4.5pt; color: #333; margin-bottom: 0.4mm; letter-spacing: 0.2px; }
-  .spec-line  { font-size: 4pt; color: #888; margin-bottom: 0.6mm; }
-  img { width: 23mm; height: 23mm; display: block; }
-  .url { font-size: 3.5pt; color: #999; margin-top: 0.4mm; text-align: center; max-width: 28mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-</style>
-</head>
-<body>
-<div class="tag-code">${tag.tag_code}</div>
-<div class="batch-name">${batchLabel}</div>
-${specLine ? `<div class="spec-line">${specLine}</div>` : ''}
-<img src="${qrSrc}" />
-<div class="url">${url.replace('https://', '')}</div>
+  .tag-code   { font-size: 6.5pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
+  .batch-name { font-size: 4.5pt; color: #333; margin-bottom: 0.3mm; letter-spacing: 0.2px; }
+  .spec-line  { font-size: 4pt; color: #888; margin-bottom: 0.5mm; }
+  img { width: 22mm; height: 22mm; display: block; }
+  .url { font-size: 3.5pt; color: #999; margin-top: 0.3mm; text-align: center;
+         max-width: 28mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+`
+
+// ── Individual QR print ────────────────────────────────────────────────────────
+function printSingleQR(tag: any) {
+  const win = window.open('', '_blank', 'width=500,height=400')
+  if (!win) { alert('Allow pop-ups to print QR labels.'); return }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>QR ${tag.tag_code}</title>
+<style>${STICKER_CSS}</style></head>
+<body><div class="grid">${stickerHTML(tag)}</div>
 <script>
-  var img = document.querySelector('img');
-  img.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 800); };
-  img.onerror = function() { window.print(); setTimeout(function(){ window.close(); }, 800); };
-<\/script>
-</body>
-</html>`)
+  var imgs = document.querySelectorAll('img'), loaded = 0;
+  function tryPrint() { if (++loaded >= imgs.length) { window.print(); setTimeout(function(){ window.close(); }, 1000); } }
+  imgs.forEach(function(img) { if (img.complete) tryPrint(); else { img.onload = tryPrint; img.onerror = tryPrint; } });
+  if (!imgs.length) { window.print(); setTimeout(function(){ window.close(); }, 1000); }
+<\/script></body></html>`)
+  win.document.close()
+}
+
+// ── Batch QR print — all tags from the same batch in one print job ─────────────
+function printBatchQR(tags: any[]) {
+  if (!tags.length) return
+  const batchName = tags[0].batch_name || 'Batch'
+  const win = window.open('', '_blank', 'width=800,height=600')
+  if (!win) { alert('Allow pop-ups to print QR labels.'); return }
+  const stickers = tags.map(stickerHTML).join('')
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>Batch ${batchName} — ${tags.length} tags</title>
+<style>${STICKER_CSS}
+  h1 { font-size: 9pt; color: #555; margin-bottom: 4mm; font-family: monospace; }
+</style></head>
+<body>
+<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags</h1>
+<div class="grid">${stickers}</div>
+<script>
+  var imgs = document.querySelectorAll('img'), loaded = 0, total = imgs.length;
+  function tryPrint() { if (++loaded >= total) { window.print(); setTimeout(function(){ window.close(); }, 1200); } }
+  imgs.forEach(function(img) { if (img.complete) tryPrint(); else { img.onload = tryPrint; img.onerror = tryPrint; } });
+  if (!total) { window.print(); setTimeout(function(){ window.close(); }, 1000); }
+<\/script></body></html>`)
   win.document.close()
 }
 
@@ -283,6 +316,31 @@ function AssembleTab() {
               <div className="text-xs text-[var(--c4)] mt-1">Shipped</div>
             </div>
           </div>
+
+          {/* Print Whole Batch — grouped by batch_name */}
+          {(() => {
+            const batches: Record<string, typeof workflowTags> = {}
+            workflowTags.forEach(t => {
+              const key = t.batch_name || 'Unnamed'
+              if (!batches[key]) batches[key] = []
+              batches[key].push(t)
+            })
+            const batchEntries = Object.entries(batches)
+            if (!batchEntries.length) return null
+            return (
+              <div className="mb-5 flex flex-wrap gap-2">
+                {batchEntries.map(([name, bTags]) => (
+                  <button
+                    key={name}
+                    onClick={() => printBatchQR(bTags)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--c2)] hover:opacity-80 text-white rounded-lg text-sm font-semibold shadow"
+                  >
+                    🖨️ Print Batch "{name}" ({bTags.length} tags)
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
 
           {/* Workflow steps legend */}
           <div className="mb-5 p-3 bg-[var(--bg-card)] border border-white/10 rounded-lg text-xs text-[var(--c4)]">

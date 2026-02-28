@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 
@@ -56,6 +56,73 @@ export default function TagScanPage({ params }: PageProps) {
   const [attachSuccess, setAttachSuccess] = useState(false)
   const [mintingStep, setMintingStep] = useState(0) // 0=idle, 1=saving, 2=ipfs, 3=blockchain, 4=done, -1=error
   const [mintingError, setMintingError] = useState<{ message: string; code: string; step: string } | null>(null)
+
+  // ── Inline QR camera scanner ──────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scanStatus, setScanStatus] = useState<'requesting' | 'scanning' | 'error'>('requesting')
+  const [scanError, setScanError] = useState('')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const rafRef = useRef<number>(0)
+
+  const stopScanner = useCallback(() => {
+    cancelAnimationFrame(rafRef.current)
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+  }, [])
+
+  const openScanner = useCallback(async () => {
+    setScannerOpen(true)
+    setScanStatus('requesting')
+    setScanError('')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      await new Promise(r => setTimeout(r, 150))
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      }
+      setScanStatus('scanning')
+      const jsQR = (await import('jsqr')).default
+      const scan = () => {
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+          rafRef.current = requestAnimationFrame(scan); return
+        }
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' })
+        if (code?.data) {
+          const match = code.data.match(/\/t\/(RL-\d+)/i)
+          if (match) {
+            stopScanner(); setScannerOpen(false)
+            router.push('/t/' + match[1].toUpperCase()); return
+          }
+        }
+        rafRef.current = requestAnimationFrame(scan)
+      }
+      rafRef.current = requestAnimationFrame(scan)
+    } catch (err: any) {
+      const msg = err.name === 'NotAllowedError'
+        ? 'Camera permission denied — allow camera access in your browser settings.'
+        : err.name === 'NotFoundError' ? 'No camera found on this device.'
+        : 'Camera error: ' + err.message
+      setScanError(msg); setScanStatus('error')
+    }
+  }, [router, stopScanner])
+
+  const closeScanner = useCallback(() => { stopScanner(); setScannerOpen(false) }, [stopScanner])
+
+  useEffect(() => () => stopScanner(), [stopScanner])
 
   // BASIC
   const [animalName, setAnimalName] = useState('')
@@ -431,13 +498,71 @@ export default function TagScanPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-[var(--bg)] py-8 px-4">
+
+      {/* ── Inline camera scanner overlay ── */}
+      {scannerOpen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Scan frame */}
+          {scanStatus === 'scanning' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="relative w-64 h-64">
+                <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-lg" />
+                <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-lg" />
+                <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-lg" />
+                <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-lg" />
+                <style>{`@keyframes scanLine{0%{top:8px;opacity:1}50%{top:calc(100% - 8px);opacity:.6}100%{top:8px;opacity:1}}.scan-anim{animation:scanLine 2s ease-in-out infinite;position:absolute;}`}</style>
+                <div className="scan-anim left-2 right-2 h-0.5 bg-gradient-to-r from-transparent via-green-400 to-transparent" />
+              </div>
+            </div>
+          )}
+
+          {/* Top bar */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent z-10">
+            <button onClick={closeScanner} className="text-white bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm backdrop-blur-sm">
+              ✕ Cancel
+            </button>
+            <span className="text-white font-semibold text-sm">Point at RanchLink QR</span>
+            <div className="w-20" />
+          </div>
+
+          {/* Bottom status */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 to-transparent z-10 text-center">
+            {scanStatus === 'requesting' && (
+              <div className="text-white">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2" />
+                <p className="text-sm">Requesting camera...</p>
+              </div>
+            )}
+            {scanStatus === 'scanning' && <p className="text-gray-300 text-sm">Point the camera at the QR code on the cattle tag</p>}
+            {scanStatus === 'error' && (
+              <div>
+                <p className="text-red-400 text-sm mb-3">{scanError}</p>
+                <button onClick={openScanner} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm mr-2">Try Again</button>
+                <button onClick={closeScanner} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm">Cancel</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto">
 
         {/* Tag Info Card */}
         <div className="card mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">Tag: {tag_code}</h1>
-            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+          <div className="flex items-start justify-between mb-4 gap-3">
+            <div>
+              <h1 className="text-3xl font-bold">Tag: {tag_code}</h1>
+              <button
+                onClick={openScanner}
+                className="mt-2 flex items-center gap-1.5 text-xs text-[var(--c2)] hover:underline"
+              >
+                📷 Scan a different tag
+              </button>
+            </div>
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold flex-shrink-0 ${
               onChainStatus === 'on-chain' ? 'bg-green-900/20 text-green-400'
               : onChainStatus === 'anchored' ? 'bg-cyan-900/20 text-cyan-400'
               : 'bg-yellow-900/20 text-yellow-400'
