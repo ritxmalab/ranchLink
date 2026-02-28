@@ -699,12 +699,38 @@ export default function SuperAdminPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">Color</label>
+                  {/* Bambu Lab filament swatches + custom entry */}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      { name: 'Bambu Yellow', hex: '#F5C518' },
+                      { name: 'Bambu Orange', hex: '#F47920' },
+                      { name: 'Bambu Red', hex: '#D32F2F' },
+                      { name: 'Bambu Green', hex: '#2E7D32' },
+                      { name: 'Bambu Blue', hex: '#1565C0' },
+                      { name: 'Bambu White', hex: '#F5F5F5' },
+                      { name: 'Bambu Black', hex: '#212121' },
+                      { name: 'Bambu Gray', hex: '#757575' },
+                      { name: 'Mesquite', hex: '#8B6914' },
+                      { name: 'Lime', hex: '#A3C639' },
+                      { name: 'Pink', hex: '#E91E8C' },
+                      { name: 'Purple', hex: '#7B1FA2' },
+                    ].map(({ name, hex }) => (
+                      <button
+                        key={name}
+                        type="button"
+                        title={name}
+                        onClick={() => setColor(name)}
+                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${color === name ? 'border-[var(--c2)] scale-110 ring-2 ring-[var(--c2)]/50' : 'border-white/30'}`}
+                        style={{ backgroundColor: hex }}
+                      />
+                    ))}
+                  </div>
                   <input
                     type="text"
-                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white text-gray-900"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white text-gray-900 text-sm"
                     value={color}
-                    onChange={e=>setColor(e.target.value)}
-                    placeholder="Mesquite"
+                    onChange={e => setColor(e.target.value)}
+                    placeholder="e.g. Bambu Yellow PETG"
                   />
                 </div>
                 <div>
