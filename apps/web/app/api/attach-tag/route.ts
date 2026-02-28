@@ -195,11 +195,12 @@ export async function POST(request: NextRequest) {
       publicId = newAnimal.public_id
     }
 
-    // 5. Link tag to animal
+    // 5. Link tag to animal — write public_id so /t/[tag_code] can redirect without a join
     const { error: updateError } = await supabase
       .from('tags')
       .update({
         animal_id: animalId,
+        public_id: publicId,
         ranch_id: tag.ranch_id || null,
         status: 'attached',
       })
@@ -208,6 +209,12 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 })
     }
+
+    // 5b. Write tag_id back to animal so the reverse lookup works
+    await supabase
+      .from('animals')
+      .update({ tag_id: tag.id })
+      .eq('id', animalId)
 
     // 6. Pin complete metadata to IPFS and update NFT tokenURI on-chain
     let metadataCid: string | null = null

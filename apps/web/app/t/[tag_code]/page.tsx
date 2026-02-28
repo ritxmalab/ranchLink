@@ -112,8 +112,11 @@ export default function TagScanPage({ params }: PageProps) {
       }
       const data = await response.json()
 
-      if (data.tag?.animal_id && data.tag?.animals?.public_id) {
-        router.push(`/a/${data.tag.animals.public_id}`)
+      // Redirect to animal card if already attached
+      // Use tag.public_id first (most reliable), fall back to animals join
+      const attachedPublicId = data.tag?.public_id || data.tag?.animals?.public_id
+      if (data.tag?.animal_id && attachedPublicId) {
+        router.push(`/a/${attachedPublicId}`)
         return
       }
 
