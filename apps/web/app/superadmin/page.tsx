@@ -130,9 +130,12 @@ function formatTokenCode(tag: { tag_code?: string; token_id?: string | null; min
 // ── Individual QR print — isolated 30 mm sticker ─────────────────────────────
 // Opens a new window sized exactly to the sticker, auto-prints, then closes.
 function printSingleQR(tag: any) {
-  const tokenCode = formatTokenCode(tag)
   const url = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(url)}`
+  // Batch name shown on label (e.g. TST_ATX_270226) — falls back to tag code
+  const batchLabel = tag.batch_name || tag.tag_code
+  // Material spec line — e.g. "Yellow · PETG-HF"
+  const specLine = [tag.color, tag.material?.split(' ')[0]].filter(Boolean).join(' · ')
   const win = window.open('', '_blank', 'width=300,height=340')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
   win.document.write(`<!DOCTYPE html>
@@ -150,15 +153,17 @@ function printSingleQR(tag: any) {
     font-family: monospace; background: #fff;
     overflow: hidden;
   }
-  .tag-code { font-size: 6.5pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.5mm; }
-  .token-code { font-size: 5pt; color: #444; margin-bottom: 0.8mm; letter-spacing: 0.3px; }
-  img { width: 24mm; height: 24mm; display: block; }
-  .url { font-size: 4pt; color: #666; margin-top: 0.5mm; text-align: center; max-width: 28mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tag-code  { font-size: 6.5pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
+  .batch-name { font-size: 4.5pt; color: #333; margin-bottom: 0.4mm; letter-spacing: 0.2px; }
+  .spec-line  { font-size: 4pt; color: #888; margin-bottom: 0.6mm; }
+  img { width: 23mm; height: 23mm; display: block; }
+  .url { font-size: 3.5pt; color: #999; margin-top: 0.4mm; text-align: center; max-width: 28mm; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
 <div class="tag-code">${tag.tag_code}</div>
-<div class="token-code">${tokenCode}</div>
+<div class="batch-name">${batchLabel}</div>
+${specLine ? `<div class="spec-line">${specLine}</div>` : ''}
 <img src="${qrSrc}" />
 <div class="url">${url.replace('https://', '')}</div>
 <script>
@@ -318,10 +323,19 @@ function AssembleTab() {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-mono font-bold text-base">{tag.tag_code}</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-semibold ${statusBadge(tag.status)}`}>
-                          {tag.status.replace(/_/g, ' ')}
+                          {STATUS_LABELS[tag.status] || tag.status.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <div className="font-mono text-xs text-[var(--c2)] mb-1 break-all">{tokenCode}</div>
+                      {/* Batch name — e.g. TST_ATX_270226 */}
+                      {tag.batch_name && (
+                        <div className="font-mono text-xs text-[var(--c2)] mb-0.5">{tag.batch_name}</div>
+                      )}
+                      {/* Physical specs — color · material */}
+                      {(tag.color || tag.material) && (
+                        <div className="text-xs text-[var(--c4)] mb-1">
+                          {[tag.color, tag.material].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
                       {tag.assembled_at && (
                         <div className="text-xs text-[var(--c4)]">
                           Assembled: {new Date(tag.assembled_at).toLocaleDateString()}
