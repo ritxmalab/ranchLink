@@ -17,19 +17,15 @@ function getServerConfig() {
   return { url, serviceKey }
 }
 
-let cachedServerClient: AnySupabaseClient | null = null
-
 export function getSupabaseServerClient(): AnySupabaseClient {
-  if (!cachedServerClient) {
-    const { url, serviceKey } = getServerConfig()
-    cachedServerClient = createClient(url, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-  }
-
-  return cachedServerClient
+  // Do NOT cache — Vercel serverless can reuse module instances across requests
+  // with stale env vars baked in. Always create fresh to pick up current env.
+  const { url, serviceKey } = getServerConfig()
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }
 
