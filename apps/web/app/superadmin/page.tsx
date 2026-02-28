@@ -209,15 +209,18 @@ function AssembleTab() {
 
   const statusBadge = (status: string) => {
     const map: Record<string, string> = {
+      pre_identity:      'bg-cyan-900/20 text-cyan-400',
       on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
-      assembled: 'bg-yellow-900/20 text-yellow-400',
-      in_inventory: 'bg-green-900/20 text-green-400',
-      attached: 'bg-purple-900/20 text-purple-400',
+      assembled:         'bg-yellow-900/20 text-yellow-400',
+      in_inventory:      'bg-green-900/20 text-green-400',
+      attached:          'bg-purple-900/20 text-purple-400',
     }
     return map[status] || 'bg-gray-900/20 text-gray-400'
   }
 
-  const workflowTags = tags.filter(t => t.status === 'on_chain_unclaimed' || t.status === 'assembled')
+  const workflowTags = tags.filter(t =>
+    t.status === 'on_chain_unclaimed' || t.status === 'pre_identity' || t.status === 'assembled'
+  )
 
   return (
     <div className="card">
@@ -513,35 +516,21 @@ export default function SuperAdminPage() {
       // Refresh from server to get latest data (including any failed tags)
       await fetchDevices()
       
-      // v1.0: Use mint_summary from API response
-      const successfulMints = data.mint_summary?.successful || 0
-      const failedMints = data.mint_summary?.failed || 0
+      // v2.0: Merkle anchoring — all tags are anchored in one tx
       const totalRequested = data.mint_summary?.total || batchSize
-      
-      // Show message based on API response
-      let message = data.message || ''
-      
-      // If API provided warnings, show them
-      if (data.warnings && data.warnings.length > 0) {
-        message += '\n\n' + data.warnings.join('\n')
+      const anchorTx = data.anchor?.tx_hash
+      const basescanUrl = data.anchor?.basescan_url
+
+      let message = data.message || `✅ ${totalRequested} tags anchored on Base Mainnet`
+      if (anchorTx) {
+        message += `\n\n⚓ Anchor tx: ${anchorTx}`
+        if (basescanUrl) message += `\nBasescan: ${basescanUrl}`
       }
-      
-      // If pre-flight checks failed, show them
-      if (data.preflight_checks) {
-        message += '\n\nPre-flight checks:\n' + data.preflight_checks.join('\n')
+      if (data.anchor?.merkle_root) {
+        message += `\n\nMerkle root: ${data.anchor.merkle_root}`
       }
-      
-      // If there are errors, show them
-      if (data.errors && data.errors.length > 0) {
-        message += '\n\nErrors:\n' + data.errors.join('\n')
-      }
-      
+      message += `\n\nTags will mint as ERC-1155 NFTs when farmers claim them (lazy mint).`
       setMessage(message)
-      
-      // Show error if all mints failed
-      if (failedMints === totalRequested && successfulMints === 0) {
-        setErrorMessage(`All ${totalRequested} tags failed to mint. Check server wallet balance, RPC connection, and MINTER_ROLE. See logs in Vercel for details.`)
-      }
       
       // Scroll to QR codes section after a brief delay
       setTimeout(() => {
@@ -574,9 +563,11 @@ export default function SuperAdminPage() {
     }
   }
 
-  const getOnChainStatus = (device: Device): 'on-chain' | 'off-chain' | 'error' => {
+  const getOnChainStatus = (device: Device): 'on-chain' | 'anchored' | 'off-chain' | 'error' => {
     if (device.token_id && device.contract_address) {
-      return 'on-chain'
+      return 'on-chain'  // ERC-721 or lazy-minted ERC-1155
+    } else if ((device as any).status === 'pre_identity' || (device as any).metadata?.anchor_tx_hash) {
+      return 'anchored'  // Merkle-anchored, not yet lazy-minted
     } else if (!device.token_id) {
       return 'off-chain'
     } else {
@@ -633,7 +624,7 @@ export default function SuperAdminPage() {
             <div className="card">
               <h2 className="text-2xl font-bold mb-4">🏭 Factory - Generate & Mint Tags</h2>
               <p className="text-[var(--c4)] mb-6">
-                Generate blockchain-linked tags for production. Tags are pre-minted on Base Mainnet and ready for printing.
+                Generate blockchain-linked tags. One transaction anchors the entire batch on Base Mainnet (ERC-1155). Tags mint as NFTs when farmers claim them.
               </p>
 
               {/* Batch Creation Form */}
@@ -816,6 +807,11 @@ export default function SuperAdminPage() {
                                     ✅ ON-CHAIN
                                   </span>
                                 )}
+                                {onChainStatus === 'anchored' && (
+                                  <span className="px-2 py-1 bg-cyan-900/20 text-cyan-400 rounded text-xs font-semibold">
+                                    ⚓ ANCHORED
+                                  </span>
+                                )}
                                 {onChainStatus === 'off-chain' && (
                                   <span className="px-2 py-1 bg-yellow-900/20 text-yellow-400 rounded text-xs font-semibold">
                                     ⚪ OFF-CHAIN
@@ -929,6 +925,13 @@ export default function SuperAdminPage() {
                                           {device.contract_address.substring(0, 10)}...{device.contract_address.substring(device.contract_address.length - 8)}
                                         </div>
                                       )}
+                                    </div>
+                                  ) : onChainStatus === 'anchored' ? (
+                                    <div className="text-center">
+                                      <div className="inline-block bg-cyan-900/30 border-2 border-cyan-600 text-cyan-300 px-4 py-2 rounded-lg text-sm font-bold">
+                                        ⚓ ANCHORED
+                                      </div>
+                                      <div className="text-[9px] text-gray-500 mt-1">Merkle proof on-chain · NFT mints at claim</div>
                                     </div>
                                   ) : onChainStatus === 'off-chain' ? (
                                     <div className="text-center">
@@ -1089,6 +1092,11 @@ export default function SuperAdminPage() {
                             {onChainStatus === 'on-chain' && (
                               <span className="px-2 py-1 bg-green-900/20 text-green-400 rounded text-xs font-semibold">
                                 ✅ ON-CHAIN
+                              </span>
+                            )}
+                            {onChainStatus === 'anchored' && (
+                              <span className="px-2 py-1 bg-cyan-900/20 text-cyan-400 rounded text-xs font-semibold">
+                                ⚓ ANCHORED
                               </span>
                             )}
                             {onChainStatus === 'off-chain' && (

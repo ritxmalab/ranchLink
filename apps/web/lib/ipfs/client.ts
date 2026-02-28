@@ -119,3 +119,31 @@ export async function pinAnimalMetadata(animal: any, ranch?: any): Promise<strin
   }
   return pinJSON(metadata)
 }
+
+/**
+ * Pin a batch manifest to IPFS.
+ * Used by the factory v2.0 Merkle anchoring flow.
+ */
+export async function pinBatchManifest(data: {
+  batchId: string
+  batchName: string
+  tagCodes: string[]
+  merkleRoot: string
+  model: string
+  material: string
+  color: string
+}): Promise<string> {
+  const manifest = {
+    name: `RanchLink Batch Manifest — ${data.batchName}`,
+    description: 'RanchLink factory batch manifest. Contains all tag codes and Merkle root for on-chain verification.',
+    batch_id: data.batchId,
+    batch_name: data.batchName,
+    merkle_root: data.merkleRoot,
+    tag_count: data.tagCodes.length,
+    tag_codes: data.tagCodes,
+    hardware: { model: data.model, material: data.material, color: data.color },
+    created_at: new Date().toISOString(),
+    schema_version: '2.0',
+  }
+  return pinJSON(manifest)
+}

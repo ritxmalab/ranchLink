@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     // 1. Load tag — must exist and be on-chain
     const { data: tag, error: tagError } = await supabase
       .from('tags')
-      .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash')
+      .select('id, tag_code, animal_id, ranch_id, status, token_id, contract_address, mint_tx_hash, metadata')
       .eq('tag_code', tagCode)
       .single()
 
@@ -92,17 +92,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }
 
-    // 2. Tag MUST be on-chain before attach (v1.0 rule)
-    if (!tag.token_id || !tag.contract_address) {
+    // 2. Tag must be in a valid state for attachment
+    // v2.0: pre_identity tags (Merkle-anchored) are valid — they lazy-mint at attach time
+    // v1.0: on_chain_unclaimed tags (already minted ERC-721) are valid
+    const validStatuses = ['on_chain_unclaimed', 'pre_identity', 'assembled', 'in_inventory']
+    if (!validStatuses.includes(tag.status)) {
       return NextResponse.json(
         {
-          error: 'Tag is not on-chain',
-          message: 'This tag has not been minted yet. Tags must be minted on-chain before they can be attached to an animal.',
+          error: 'Tag is not available for attachment',
           tag_code: tag.tag_code,
           status: tag.status,
           suggestion: tag.status === 'mint_failed'
-            ? 'The mint failed during batch creation. Please use the Retry Mint button in the Inventory tab to complete the mint.'
-            : 'Please wait for the mint to complete, or use Retry Mint if it failed.',
+            ? 'Use the Retry Mint button in the Inventory tab.'
+            : tag.status === 'attached'
+            ? 'This tag is already attached to an animal.'
+            : 'Tag is not in a claimable state.',
         },
         { status: 400 }
       )
@@ -216,9 +220,10 @@ export async function POST(request: NextRequest) {
       .update({ tag_id: tag.id })
       .eq('id', animalId)
 
-    // 6. Pin complete metadata to IPFS and update NFT tokenURI on-chain
+    // 6. Pin metadata to IPFS
     let metadataCid: string | null = null
     let metadataTxHash: string | null = null
+    let tokenId: string | null = tag.token_id || null
 
     try {
       let ranchData = null
@@ -237,36 +242,75 @@ export async function POST(request: NextRequest) {
         .eq('id', animalId)
         .single()
 
-      if (completeAnimal && tag.token_id) {
+      if (completeAnimal) {
         const { pinAnimalMetadata } = await import('@/lib/ipfs/client')
         metadataCid = await pinAnimalMetadata(completeAnimal, ranchData)
-        console.log(`[ATTACH-TAG] Metadata pinned to IPFS: ${metadataCid}`)
+        console.log(`[ATTACH-TAG] Metadata pinned: ${metadataCid}`)
+      }
+    } catch (e: any) {
+      console.error('[ATTACH-TAG] IPFS pin failed (non-blocking):', e.message)
+    }
 
-        const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
-        const tokenId = BigInt(tag.token_id)
-        metadataTxHash = await setCID(tokenId, metadataCid)
-        console.log(`[ATTACH-TAG] TokenURI updated on-chain: ${metadataTxHash}`)
+    // 7. Lazy mint ERC-1155 token (pre_identity → active RWA)
+    //    For legacy ERC-721 tags (already have token_id), just update CID.
+    //    For new pre_identity tags, mint the ERC-1155 token now.
+    const isPre = tag.status === 'pre_identity' || !tag.token_id
+    const tagMeta = (tag as any).metadata || {}
+
+    if (isPre && tagMeta.batch_id_hex && tagMeta.merkle_proof && metadataCid) {
+      try {
+        const { lazyMintTag } = await import('@/lib/blockchain/ranchLinkTag1155')
+        const result = await lazyMintTag(
+          tagCode,
+          tagMeta.batch_id_hex as `0x${string}`,
+          tagMeta.merkle_proof as `0x${string}`[],
+          metadataCid
+        )
+        tokenId = result.tokenId.toString()
+        metadataTxHash = result.txHash
+        console.log(`[ATTACH-TAG] ✅ ERC-1155 lazy mint: tokenId=${tokenId}, tx=${metadataTxHash}`)
 
         await supabase
           .from('tags')
           .update({
+            token_id: tokenId,
+            mint_tx_hash: metadataTxHash,
             metadata_cid: metadataCid,
             metadata_tx_hash: metadataTxHash,
           })
           .eq('id', tag.id)
+      } catch (e: any) {
+        console.error('[ATTACH-TAG] Lazy mint failed (non-blocking):', e.message)
+        // Tag is still attached in DB — mint can be retried later
+        if (metadataCid) {
+          await supabase.from('tags').update({ metadata_cid: metadataCid }).eq('id', tag.id)
+        }
       }
-    } catch (error: any) {
-      console.error('[ATTACH-TAG] Failed to update metadata (non-blocking):', error)
+    } else if (tag.token_id && metadataCid) {
+      // Legacy ERC-721 path: just update CID
+      try {
+        const { setCID } = await import('@/lib/blockchain/ranchLinkTag')
+        metadataTxHash = await setCID(BigInt(tag.token_id), metadataCid)
+        console.log(`[ATTACH-TAG] ERC-721 CID updated: ${metadataTxHash}`)
+        await supabase
+          .from('tags')
+          .update({ metadata_cid: metadataCid, metadata_tx_hash: metadataTxHash })
+          .eq('id', tag.id)
+      } catch (e: any) {
+        console.error('[ATTACH-TAG] ERC-721 setCID failed (non-blocking):', e.message)
+      }
     }
 
     return NextResponse.json({
       success: true,
       public_id: publicId,
       tag_code: tagCode,
+      token_id: tokenId,
       message: 'Tag attached successfully',
       metadata_updated: !!metadataCid,
       metadata_cid: metadataCid,
       metadata_tx_hash: metadataTxHash,
+      on_chain: !!tokenId,
     })
   } catch (error: any) {
     console.error('Attach tag error:', error)

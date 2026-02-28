@@ -172,14 +172,24 @@ target_ranch_id, status, created_at
 
 ---
 
+## Architecture v2.0 — Merkle Anchoring + ERC-1155 Lazy Mint (deployed 2026-02-25)
+- **Factory**: one `anchorBatch()` tx per batch (any size, ~$0.05 flat)
+- **Attach**: `lazyMint()` activates tag as ERC-1155 NFT at claim time (~$0.002/tag)
+- **Legacy ERC-721** tags (RL-001 to RL-009) still work via `setCID` on old contract
+- **New tag status**: `pre_identity` = anchored on-chain, NFT mints when farmer claims
+- **ERC-1155 contract**: `0x559D8f4196578c2308e092225bdFbBc1AF88d0Fb` (Base Mainnet)
+- **Merkle utility**: `apps/web/lib/blockchain/merkle.ts`
+- **1155 blockchain lib**: `apps/web/lib/blockchain/ranchLinkTag1155.ts`
+
 ## Environment Variables (all set in Vercel + .env.local)
 
 | Variable | Value / Notes |
 |---|---|
 | `NEXT_PUBLIC_CHAIN_ID` | `8453` (Base Mainnet) |
 | `NEXT_PUBLIC_APP_URL` | `https://ranch-link.vercel.app` |
-| `NEXT_PUBLIC_CONTRACT_TAG` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` |
-| `RANCHLINKTAG_ADDRESS` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` |
+| `NEXT_PUBLIC_CONTRACT_TAG` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` (ERC-721 legacy) |
+| `RANCHLINKTAG_ADDRESS` | `0x2BAc88732c526d25698Bcd8940048Dac3d3e6C3B` (ERC-721 legacy) |
+| `RANCHLINKTAG_1155_ADDRESS` | `0x559D8f4196578c2308e092225bdFbBc1AF88d0Fb` (ERC-1155 v2) |
 | `SERVER_WALLET_ADDRESS` | `0x6781Eb019e553c3C3732c4B11e6859638282ED96` |
 | `NEXT_PUBLIC_ALCHEMY_BASE_RPC` | Alchemy Base Mainnet RPC |
 | `PINATA_JWT` | Set in Vercel ✅ |
