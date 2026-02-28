@@ -34,8 +34,21 @@ export async function GET(
       .single()
 
     if (error || !tag) {
+      // Debug: try a simpler query to see what's happening
+      const { data: simpleTag, error: simpleError } = await supabase
+        .from('tags')
+        .select('id, tag_code, status, public_id, animal_id')
+        .eq('tag_code', tag_code)
+        .maybeSingle()
+      
       return NextResponse.json(
-        { error: 'Tag not found', supabase_error: error?.message },
+        { 
+          error: 'Tag not found', 
+          supabase_error: error?.message,
+          simple_query: simpleTag,
+          simple_error: simpleError?.message,
+          key_prefix: process.env.SUPABASE_SERVICE_KEY?.substring(0, 15),
+        },
         { status: 404 }
       )
     }
