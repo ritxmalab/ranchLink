@@ -73,6 +73,7 @@ export default function TagScanPage({ params }: PageProps) {
   }, [])
 
   const openScanner = useCallback(async () => {
+    stopScanner() // always clean up any previous stream before opening a new one
     setScannerOpen(true)
     setScanStatus('requesting')
     setScanError('')
@@ -221,7 +222,17 @@ export default function TagScanPage({ params }: PageProps) {
         photoForm.append('file', photoFile)
         const photoRes = await fetch('/api/upload-photo', { method: 'POST', body: photoForm })
         const photoData = await photoRes.json()
-        if (photoRes.ok && photoData.photo_url) photoUrl = photoData.photo_url
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'t/[tag_code]/page.tsx:photo-upload',message:'photo upload result',data:{ok:photoRes.ok,status:photoRes.status,hasUrl:!!photoData.photo_url,error:photoData.error},hypothesisId:'H5',timestamp:Date.now()})}).catch(()=>{})
+        // #endregion
+        if (!photoRes.ok || !photoData.photo_url) {
+          setPhotoUploading(false)
+          setAttaching(false)
+          setMintingStep(0)
+          setError(`Photo upload failed: ${photoData.error || 'Unknown error'}. Please try a smaller image or skip the photo.`)
+          return
+        }
+        photoUrl = photoData.photo_url
         setPhotoUploading(false)
       }
 

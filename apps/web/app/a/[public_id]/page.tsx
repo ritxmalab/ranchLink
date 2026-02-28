@@ -175,6 +175,7 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
         setUpdateWeight('')
         setUpdatePhotoFile(null)
         setUpdatePhotoPreview(null)
+        setUpdateEventType('update')
         await fetchAnimal()
         setTimeout(() => setShowUpdateForm(false), 2000)
       } else {
@@ -514,9 +515,15 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
               className="flex-1 px-3 py-2 bg-black/20 rounded-lg text-white text-sm border border-white/20"
             />
             <button
-              onClick={() => navigator.clipboard.writeText(
-                `${typeof window !== 'undefined' ? window.location.origin : ''}/a/${public_id}`
-              )}
+              onClick={() => {
+                const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/a/${public_id}`
+                navigator.clipboard?.writeText(url).catch(() => {
+                  // Fallback for non-HTTPS or permission denied
+                  const el = document.createElement('textarea')
+                  el.value = url; document.body.appendChild(el); el.select()
+                  document.execCommand('copy'); document.body.removeChild(el)
+                })
+              }}
               className="btn-secondary bg-white text-[var(--c2)] hover:bg-white/90 text-sm px-4"
             >
               Copy

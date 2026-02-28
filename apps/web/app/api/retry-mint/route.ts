@@ -29,6 +29,16 @@ export async function POST(request: NextRequest) {
       { status: 429 }
     )
   }
+
+  // Superadmin-only — this endpoint triggers on-chain mints from the server wallet
+  const cookieHeader = request.headers.get('cookie') || ''
+  const isSuperadmin = cookieHeader.split(';').some(c => {
+    const t = c.trim()
+    return t.startsWith('rl_superadmin=') && t.split('=')[1]?.trim().length > 0
+  })
+  if (!isSuperadmin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   
   try {
     const body = await request.json()

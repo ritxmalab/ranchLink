@@ -265,12 +265,19 @@ function AssembleTab() {
 
   const handleAction = async (tagId: string, action: 'assemble' | 'push_to_inventory') => {
     setActionLoading(tagId + action)
-    await fetch('/api/superadmin/assemble', {
+    const res = await fetch('/api/superadmin/assemble', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag_id: tagId, action, assembled_by: 'superadmin' }),
     })
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'superadmin/page.tsx:handleAction',message:'assemble action response',data:{tagId,action,status:res.status,ok:res.ok},hypothesisId:'H29',timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+      alert(`Action failed: ${err.error || err.message || 'Unknown error'}`)
+    }
     await fetchAssembleTags()
     setActionLoading(null)
   }
@@ -1372,13 +1379,17 @@ export default function SuperAdminPage() {
                                       ship: 'Mark as Shipped',
                                     }
                                     if (!confirm(`${labels[action] || action} for ${device.tag_code}?`)) return
-                                    await fetch('/api/superadmin/assemble', {
+                                    const r = await fetch('/api/superadmin/assemble', {
                                       method: 'POST',
                                       credentials: 'include',
                                       headers: { 'Content-Type': 'application/json' },
                                       body: JSON.stringify({ tag_id: device.id, action }),
                                     })
-                                    fetchDevices()
+                                    if (!r.ok) {
+                                      const err = await r.json().catch(() => ({ error: `HTTP ${r.status}` }))
+                                      alert(`Action failed: ${err.error || 'Unknown error'}`)
+                                    }
+                                    await fetchDevices()
                                   }}
                                 >
                                   <option value="">Actions ▾</option>

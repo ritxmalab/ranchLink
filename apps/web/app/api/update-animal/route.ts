@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 const updateSchema = z.object({
   public_id: z.string().min(1),
   claim_token: z.string().uuid().optional(),
+  photo_url: z.string().url().optional(),
   // BASIC
   name: z.string().min(1).max(100).optional(),
   species: z.string().min(1).max(50).optional(),
@@ -68,6 +69,10 @@ export async function POST(request: NextRequest) {
       throw e
     }
 
+    // #region agent log
+    const _logBody = { public_id: validated.public_id, has_photo_url: !!validated.photo_url, fields: Object.keys(validated) }
+    try { await fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/update-animal/route.ts:validated',message:'validated body keys',data:_logBody,hypothesisId:'H23',timestamp:Date.now()})}) } catch {}
+    // #endregion
     const { public_id, claim_token, event_type, notes, weight, event_notes, event_weight, ...animalFields } = validated
     // Normalize field names — prefer new names, fall back to legacy
     const resolvedNotes = notes ?? event_notes

@@ -65,7 +65,14 @@ export default function ScanPage() {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' })
-        if (code?.data) { handleFound(code.data); return }
+        if (code?.data) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'scan/page.tsx:68',message:'QR detected - handleFound result',data:{raw:code.data,matched:handleFound(code.data)},hypothesisId:'H15',timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+          // Only stop looping if handleFound recognised the code (returns true).
+          // Non-RanchLink QR codes return false — keep scanning.
+          if (handleFound(code.data)) return
+        }
         rafRef.current = requestAnimationFrame(scan)
       }
       rafRef.current = requestAnimationFrame(scan)

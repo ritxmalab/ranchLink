@@ -37,9 +37,18 @@ export default function StartPage() {
     return null
   }
 
-  // Auto-redirect as soon as a valid code is detected
+  // Auto-redirect only when the full token code is complete (not mid-typing).
+  // RL-029 is 6 chars min; RL-029-A3F2B1C4 is 15 chars. We wait for a plain
+  // RL-XXX (no trailing dash) or a full token code (dash + 8+ chars after).
   useEffect(() => {
-    const code = extractTagCode(formData.token)
+    const t = formData.token.trim()
+    // Plain tag code: RL-\d+ with no trailing dash
+    const isComplete = /^RL-\d+$/i.test(t) || /^RL-\d+-.{6,}/i.test(t) || /\/t\/RL-\d+/i.test(t)
+    if (!isComplete) return
+    const code = extractTagCode(t)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'start/page.tsx:auto-redirect',message:'auto-redirect check',data:{input:t,code,isComplete},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
     if (code) router.push(`/t/${code}`)
   }, [formData.token, router])
 
