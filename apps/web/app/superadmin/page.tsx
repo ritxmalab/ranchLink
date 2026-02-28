@@ -176,6 +176,34 @@ ${specLine ? `<div class="spec-line">${specLine}</div>` : ''}
   win.document.close()
 }
 
+// ── Shared status helpers — used by AssembleTab and InventoryTab ──────────────
+function statusBadge(status: string): string {
+  const map: Record<string, string> = {
+    pre_identity:       'bg-cyan-900/20 text-cyan-400',
+    on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
+    assembled:          'bg-yellow-900/20 text-yellow-400',
+    in_inventory:       'bg-green-900/20 text-green-400',
+    demo:               'bg-orange-900/20 text-orange-400',
+    for_sale:           'bg-pink-900/20 text-pink-400',
+    sold:               'bg-rose-900/20 text-rose-400',
+    shipped:            'bg-teal-900/20 text-teal-400',
+    attached:           'bg-purple-900/20 text-purple-400',
+  }
+  return map[status] || 'bg-gray-900/20 text-gray-400'
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pre_identity:       '⚓ Pre-Identity',
+  on_chain_unclaimed: '🔵 On-Chain',
+  assembled:          '📦 Assembled',
+  in_inventory:       '🏬 In Inventory',
+  demo:               '🎯 Demo',
+  for_sale:           '🏷️ For Sale',
+  sold:               '💰 Sold',
+  shipped:            '🚚 Shipped',
+  attached:           '🐄 Attached',
+}
+
 // ── Assemble Tab ──────────────────────────────────────────────────────────────
 // Workflow: 🖨️ Print QR → 🔧 Assemble → 🖨️ Confirm Print → 📥 Push to Inventory
 // Shipping is NOT part of this flow — it appears in Inventory after purchase/gift.
@@ -213,32 +241,6 @@ function AssembleTab() {
     setPrintState(prev => ({ ...prev, [tagId]: phase }))
   }
 
-  const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      pre_identity:      'bg-cyan-900/20 text-cyan-400',
-      on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
-      assembled:         'bg-yellow-900/20 text-yellow-400',
-      in_inventory:      'bg-green-900/20 text-green-400',
-      demo:              'bg-orange-900/20 text-orange-400',
-      for_sale:          'bg-pink-900/20 text-pink-400',
-      sold:              'bg-rose-900/20 text-rose-400',
-      shipped:           'bg-teal-900/20 text-teal-400',
-      attached:          'bg-purple-900/20 text-purple-400',
-    }
-    return map[status] || 'bg-gray-900/20 text-gray-400'
-  }
-
-  const STATUS_LABELS: Record<string, string> = {
-    pre_identity:      '⚓ Pre-Identity',
-    on_chain_unclaimed: '🔵 On-Chain',
-    assembled:         '📦 Assembled',
-    in_inventory:      '🏬 In Inventory',
-    demo:              '🎯 Demo',
-    for_sale:          '🏷️ For Sale',
-    sold:              '💰 Sold',
-    shipped:           '🚚 Shipped',
-    attached:          '🐄 Attached',
-  }
 
   const workflowTags = tags.filter(t =>
     t.status === 'on_chain_unclaimed' || t.status === 'pre_identity' || t.status === 'assembled'
