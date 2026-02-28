@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       .from('animals')
       .select(`
         *,
-        photo_url,
         tags (
           tag_code,
           token_id,

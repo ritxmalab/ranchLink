@@ -11,20 +11,20 @@ export async function GET(
     const supabase = getSupabaseServerClient()
 
     // Get animal with tag and ranch info (v1.0 schema)
+    // Note: * already includes photo_url; claim_token is on tags table via separate query
     const { data: animal, error } = await supabase
       .from('animals')
       .select(`
         *,
-        photo_url,
         tags (
+          id,
           tag_code,
           token_id,
           mint_tx_hash,
           chain,
           contract_address,
           status,
-          activation_state,
-          claim_token
+          activation_state
         ),
         ranches (
           id,
