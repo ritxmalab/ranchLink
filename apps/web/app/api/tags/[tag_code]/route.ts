@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseServerClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,47 +12,39 @@ export async function GET(
 ) {
   try {
     const { tag_code } = params
-    const supabase = getSupabaseServerClient()
-
-    const { data: tag, error } = await supabase
-      .from('tags')
-      .select(`
-        *,
-        animals (
-          public_id,
-          name,
-          species,
-          breed
-        ),
-        ranches (
-          id,
-          name
-        )
-      `)
-      .eq('tag_code', tag_code)
-      .single()
-
-    if (error || !tag) {
-      // Debug: try a simpler query to see what's happening
-      const { data: simpleTag, error: simpleError } = await supabase
-        .from('tags')
-        .select('id, tag_code, status, public_id, animal_id')
-        .eq('tag_code', tag_code)
-        .maybeSingle()
-      
-      return NextResponse.json(
-        { 
-          error: 'Tag not found', 
-          supabase_error: error?.message,
-          simple_query: simpleTag,
-          simple_error: simpleError?.message,
-          key_prefix: process.env.SUPABASE_SERVICE_KEY?.substring(0, 15),
-        },
-        { status: 404 }
-      )
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_KEY
+    
+    if (!supabaseUrl || !serviceKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
 
-    return NextResponse.json({ tag, _debug: { key_prefix: process.env.SUPABASE_SERVICE_KEY?.substring(0, 15) } })
+    // Use direct REST API to bypass any JS client connection pooling
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/tags?tag_code=eq.${encodeURIComponent(tag_code)}&select=*,animals(public_id,name,species,breed),ranches(id,name)&limit=1`,
+      {
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+        },
+        cache: 'no-store',
+      }
+    )
+
+    if (!res.ok) {
+      return NextResponse.json({ error: 'Database error', status: res.status }, { status: 500 })
+    }
+
+    const rows = await res.json()
+    
+    if (!rows || rows.length === 0) {
+      return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ tag: rows[0] })
   } catch (error: any) {
     console.error('Get tag error:', error)
     return NextResponse.json(
@@ -62,4 +53,3 @@ export async function GET(
     )
   }
 }
-
