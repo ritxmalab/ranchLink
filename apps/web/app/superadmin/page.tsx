@@ -213,9 +213,25 @@ function AssembleTab() {
       on_chain_unclaimed: 'bg-blue-900/20 text-blue-400',
       assembled:         'bg-yellow-900/20 text-yellow-400',
       in_inventory:      'bg-green-900/20 text-green-400',
+      demo:              'bg-orange-900/20 text-orange-400',
+      for_sale:          'bg-pink-900/20 text-pink-400',
+      sold:              'bg-rose-900/20 text-rose-400',
+      shipped:           'bg-teal-900/20 text-teal-400',
       attached:          'bg-purple-900/20 text-purple-400',
     }
     return map[status] || 'bg-gray-900/20 text-gray-400'
+  }
+
+  const STATUS_LABELS: Record<string, string> = {
+    pre_identity:      '⚓ Pre-Identity',
+    on_chain_unclaimed: '🔵 On-Chain',
+    assembled:         '📦 Assembled',
+    in_inventory:      '🏬 In Inventory',
+    demo:              '🎯 Demo',
+    for_sale:          '🏷️ For Sale',
+    sold:              '💰 Sold',
+    shipped:           '🚚 Shipped',
+    attached:          '🐄 Attached',
   }
 
   const workflowTags = tags.filter(t =>
@@ -1086,7 +1102,9 @@ export default function SuperAdminPage() {
                             )}
                           </td>
                           <td className="py-2 px-3">
-                            <span className="capitalize text-xs px-2 py-0.5 rounded bg-white/5">{device.status?.replace(/_/g, ' ')}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded font-semibold ${statusBadge(device.status)}`}>
+                              {STATUS_LABELS[device.status] || device.status?.replace(/_/g, ' ')}
+                            </span>
                           </td>
                           <td className="py-2 px-3">
                             {onChainStatus === 'on-chain' && (
@@ -1173,33 +1191,53 @@ export default function SuperAdminPage() {
                             )}
                           </td>
                           <td className="py-2 px-3">
-                            <div className="flex items-center gap-2">
-                              {/* Print individual QR — always available for on-chain tags */}
-                              {device.token_id && (
-                                <button
-                                  onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` })}
-                                  className="px-2 py-1 bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] hover:text-white rounded text-xs"
-                                  title="Print 30mm QR sticker"
-                                >
-                                  🖨️ Print
-                                </button>
-                              )}
-                              {/* Ship — only shown for tags that are in_inventory (purchased/gifted) */}
-                              {isInInventory && (
-                                <button
-                                  onClick={async () => {
-                                    if (!confirm(`Mark ${device.tag_code} as shipped?`)) return
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {/* Print QR — always available */}
+                              <button
+                                onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` })}
+                                className="px-2 py-1 bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] hover:text-white rounded text-xs"
+                                title="Print 30mm QR sticker"
+                              >
+                                🖨️
+                              </button>
+
+                              {/* Status transition dropdown — shown for in_inventory, demo, for_sale */}
+                              {['in_inventory', 'demo', 'for_sale', 'assembled'].includes(device.status) && (
+                                <select
+                                  defaultValue=""
+                                  className="text-xs bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] rounded px-1 py-1 cursor-pointer hover:border-white/40"
+                                  onChange={async (e) => {
+                                    const action = e.target.value
+                                    if (!action) return
+                                    e.target.value = ''
+                                    const labels: Record<string, string> = {
+                                      mark_demo: 'Mark as Demo',
+                                      mark_for_sale: 'List for Sale',
+                                      mark_sold: 'Mark as Sold',
+                                      ship: 'Mark as Shipped',
+                                    }
+                                    if (!confirm(`${labels[action] || action} for ${device.tag_code}?`)) return
                                     await fetch('/api/superadmin/assemble', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ tag_id: device.id, action: 'ship' }),
+                                      body: JSON.stringify({ tag_id: device.id, action }),
                                     })
                                     fetchDevices()
                                   }}
-                                  className="px-2 py-1 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-xs"
                                 >
-                                  🚚 Ship
-                                </button>
+                                  <option value="">Actions ▾</option>
+                                  {device.status !== 'demo' && <option value="mark_demo">🎯 Mark as Demo</option>}
+                                  {device.status !== 'for_sale' && <option value="mark_for_sale">🏷️ List for Sale</option>}
+                                  {device.status !== 'sold' && <option value="mark_sold">💰 Mark as Sold</option>}
+                                  <option value="ship">🚚 Ship</option>
+                                </select>
+                              )}
+
+                              {/* Shipped / Sold — show label only */}
+                              {['shipped', 'sold'].includes(device.status) && (
+                                <span className="text-xs text-gray-500 italic">
+                                  {device.status === 'shipped' ? '🚚 Shipped' : '💰 Sold'}
+                                </span>
                               )}
                             </div>
                           </td>

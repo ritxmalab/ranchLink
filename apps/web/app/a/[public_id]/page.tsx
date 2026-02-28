@@ -70,6 +70,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+function getOwnerCookie(public_id: string): string | null {
+  if (typeof document === 'undefined') return null
+  const key = 'rl_owner_' + public_id + '='
+  return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(key))?.split('=')[1] ?? null
+}
+
 export default function AnimalPublicIdPage({ params }: { params: { public_id: string } }) {
   const { public_id } = params
   const router = useRouter()
@@ -77,6 +83,7 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isOwner, setIsOwner] = useState(false)
 
   // Update form state
   const [showUpdateForm, setShowUpdateForm] = useState(false)
@@ -90,6 +97,8 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
   useEffect(() => {
     fetchAnimal()
+    // Check owner cookie client-side (set at attach time)
+    setIsOwner(!!getOwnerCookie(public_id))
   }, [public_id])
 
   const fetchAnimal = async () => {
@@ -138,8 +147,10 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
         if (photoRes.ok && photoData.photo_url) photoUrl = photoData.photo_url
       }
 
+      const ownerToken = getOwnerCookie(public_id)
       const payload: any = {
         public_id,
+        claim_token: ownerToken || undefined,
         event_type: updateEventType,
         notes: updateNotes || undefined,
         weight: updateWeight ? parseFloat(updateWeight) : undefined,
@@ -368,19 +379,26 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
         {/* Actions */}
         <div className="flex gap-3 mt-4 flex-wrap">
-          <button
-            onClick={() => setShowUpdateForm(!showUpdateForm)}
-            className="btn-primary"
-          >
-            {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
-          </button>
+          {isOwner ? (
+            <button
+              onClick={() => setShowUpdateForm(!showUpdateForm)}
+              className="btn-primary"
+            >
+              {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-[var(--c4)] bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+              <span>🔒</span>
+              <span>Updates are restricted to the tag owner</span>
+            </div>
+          )}
           <button onClick={() => router.push('/dashboard')} className="btn-secondary">
             ← Dashboard
           </button>
         </div>
 
-        {/* Ongoing Update Form */}
-        {showUpdateForm && (
+        {/* Ongoing Update Form — owner only */}
+        {isOwner && showUpdateForm && (
           <div className="mt-4 card border-2 border-[var(--c2)]/40 bg-gradient-to-br from-blue-900/10 to-purple-900/10">
             <h3 className="text-xl font-bold mb-4">📝 Log Update</h3>
             <form onSubmit={handleUpdate} className="space-y-4">

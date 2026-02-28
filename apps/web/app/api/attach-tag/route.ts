@@ -202,6 +202,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Link tag to animal — write public_id so /t/[tag_code] can redirect without a join
+    // Generate a claim_token so the attaching farmer can edit their animal later
+    const { randomUUID } = await import('crypto')
+    const claimToken = randomUUID()
+
     const { error: updateError } = await supabase
       .from('tags')
       .update({
@@ -209,6 +213,7 @@ export async function POST(request: NextRequest) {
         public_id: publicId,
         ranch_id: tag.ranch_id || null,
         status: 'attached',
+        claim_token: claimToken,
       })
       .eq('id', tag.id)
 
@@ -315,17 +320,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       public_id: publicId,
       tag_code: tagCode,
       token_id: tokenId,
+      claim_token: claimToken,
       message: 'Tag attached successfully',
       metadata_updated: !!metadataCid,
       metadata_cid: metadataCid,
       metadata_tx_hash: metadataTxHash,
       on_chain: !!tokenId,
     })
+
+    // Set claim_token cookie so the farmer's browser can edit this animal later
+    // Keyed by public_id so multiple animals can be owned on the same device
+    response.cookies.set(`rl_owner_${publicId}`, claimToken, {
+      httpOnly: false, // needs to be readable by client JS for the animal card
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365 * 5, // 5 years
+      secure: process.env.NODE_ENV === 'production',
+    })
+
+    return response
   } catch (error: any) {
     console.error('Attach tag error:', error)
     return NextResponse.json(

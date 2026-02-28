@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 
 const updateSchema = z.object({
   public_id: z.string().min(1),
+  claim_token: z.string().uuid().optional(),
   // BASIC
   name: z.string().min(1).max(100).optional(),
   species: z.string().min(1).max(50).optional(),
@@ -65,21 +66,34 @@ export async function POST(request: NextRequest) {
       throw e
     }
 
-    const { public_id, event_type, notes, weight, event_notes, event_weight, ...animalFields } = validated
+    const { public_id, claim_token, event_type, notes, weight, event_notes, event_weight, ...animalFields } = validated
     // Normalize field names — prefer new names, fall back to legacy
     const resolvedNotes = notes ?? event_notes
     const resolvedWeight = weight ?? event_weight
     const supabase = getSupabaseServerClient()
 
-    // Load current animal + tag
+    // Load current animal + tag (include claim_token for ownership check)
     const { data: animal, error: animalError } = await supabase
       .from('animals')
-      .select('*, tags(id, token_id, contract_address, tag_code)')
+      .select('*, tags(id, token_id, contract_address, tag_code, claim_token)')
       .eq('public_id', public_id)
       .single()
 
     if (animalError || !animal) {
       return NextResponse.json({ error: 'Animal not found' }, { status: 404 })
+    }
+
+    // Ownership check — superadmin cookie bypasses this
+    const cookieHeader = request.headers.get('cookie') || ''
+    const isSuperadmin = cookieHeader.split(';').some(c => {
+      const t = c.trim()
+      return t.startsWith('rl_superadmin=') && t.split('=')[1]?.trim().length > 0
+    })
+    if (!isSuperadmin) {
+      const tagClaimToken = Array.isArray(animal.tags) ? animal.tags[0]?.claim_token : (animal.tags as any)?.claim_token
+      if (!claim_token || claim_token !== tagClaimToken) {
+        return NextResponse.json({ error: 'Unauthorized', message: 'Only the tag owner can update this animal' }, { status: 403 })
+      }
     }
 
     // Build update payload (only non-undefined fields)

@@ -9,8 +9,11 @@ export default function Home() {
         <p className="text-xl text-[var(--c4)] mb-8 max-w-2xl mx-auto">
           2-minute setup. Public Animal Card. Owner-only edits. Vet photos & proofs in one place.
         </p>
-        <div className="flex gap-4 justify-center">
-          <a href="/start" className="btn-primary">
+        <div className="flex gap-4 justify-center flex-wrap">
+          <a href="/scan" className="btn-primary text-lg px-8 py-4">
+            📷 Scan Tag
+          </a>
+          <a href="/start" className="btn-secondary">
             Get Started
           </a>
           <a href="/models" className="btn-secondary">

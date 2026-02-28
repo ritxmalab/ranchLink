@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 const assembleSchema = z.object({
   tag_id: z.string().uuid(),
-  action: z.enum(['assemble', 'push_to_inventory', 'ship']),
+  action: z.enum(['assemble', 'push_to_inventory', 'ship', 'mark_demo', 'mark_for_sale', 'mark_sold']),
   assembled_by: z.string().max(100).optional(),
 })
 
@@ -52,8 +52,14 @@ export async function POST(request: NextRequest) {
     update.status = 'assembled'
   } else if (validated.action === 'push_to_inventory') {
     update.status = 'in_inventory'
+  } else if (validated.action === 'mark_demo') {
+    update.status = 'demo'
+  } else if (validated.action === 'mark_for_sale') {
+    update.status = 'for_sale'
+  } else if (validated.action === 'mark_sold') {
+    update.status = 'sold'
   } else {
-    // ship — only reachable from Inventory tab after purchase/gift
+    // ship
     update.shipped_at = now
     update.status = 'shipped'
   }
