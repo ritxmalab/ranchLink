@@ -8,11 +8,14 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // blockchain tx receipt can take 5-30s on Base
 
 const batchSchema = z.object({
-  batchName: z.string().min(1).max(100),
+  batchName: z.string().min(1).max(200),
   batchSize: z.number().int().min(1).max(10000),
   model: z.string().min(1).max(50),
   material: z.string().min(1).max(50),
   color: z.string().min(1).max(50),
+  filamentBrand: z.string().max(100).optional(),
+  itwGrams: z.number().optional(),           // Individual Tag Weight (g)
+  batchWeightGrams: z.number().optional(),   // ITW × batchSize
   chain: z.string().optional(),
   targetRanchId: z.string().uuid().optional().nullable(),
   kitMode: z.boolean().optional(),
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
     throw e
   }
 
-  const { batchName, batchSize, model, material, color, chain = 'BASE', targetRanchId } = validated
+  const { batchName, batchSize, model, material, color, filamentBrand, itwGrams, batchWeightGrams, chain = 'BASE', targetRanchId } = validated
 
   // Pre-flight: only need private key and contract address
   const privateKey = process.env.SERVER_WALLET_PRIVATE_KEY
@@ -102,6 +105,10 @@ export async function POST(request: NextRequest) {
     body: JSON.stringify({
       name: batchName, batch_name: batchName, model, material, color, chain,
       count: batchSize, target_ranch_id: targetRanchId || null, status: 'anchoring',
+      // Physical specs — stored in batch manifest and IPFS
+      ...(filamentBrand && { filament_brand: filamentBrand }),
+      ...(itwGrams && { itw_grams: itwGrams }),
+      ...(batchWeightGrams && { batch_weight_grams: batchWeightGrams }),
     }),
   })
   const [batch] = await batchInsertRes.json()
@@ -117,15 +124,22 @@ export async function POST(request: NextRequest) {
   const batchId = keccak256(encodePacked(['string'], [batch.id]))
 
   // ── 6. Pin batch manifest to IPFS ──────────────────────────────────────────
+  const physicalSpecs = {
+    ...(filamentBrand && { filamentBrand }),
+    ...(itwGrams && { itwGrams }),
+    ...(batchWeightGrams && { batchWeightGrams }),
+  }
+
   let batchURI = `data:application/json,${encodeURIComponent(JSON.stringify({
     batchId, batchName, model, material, color, chain,
     tagCount: batchSize, tagCodes, merkleRoot, createdAt: new Date().toISOString(),
+    ...physicalSpecs,
   }))}`
 
   try {
     const { pinBatchManifest } = await import('@/lib/ipfs/client')
     if (typeof pinBatchManifest === 'function') {
-      const cid = await pinBatchManifest({ batchId, batchName, tagCodes, merkleRoot, model, material, color })
+      const cid = await pinBatchManifest({ batchId, batchName, tagCodes, merkleRoot, model, material, color, ...physicalSpecs })
       batchURI = `ipfs://${cid}`
     }
   } catch (e) {

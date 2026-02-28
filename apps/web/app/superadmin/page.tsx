@@ -409,10 +409,12 @@ export default function SuperAdminPage() {
 
   // Factory form state
   const [batchSize, setBatchSize] = useState(3)
-  const [material, setMaterial] = useState('PETG')
+  const [material, setMaterial] = useState('PETG-HF')
   const [model, setModel] = useState('BASIC_QR')
   const [chain, setChain] = useState('BASE')
-  const [color, setColor] = useState('Mesquite')
+  const [color, setColor] = useState('Yellow')
+  const [filamentBrand, setFilamentBrand] = useState('Bambu Lab')
+  const [itwGrams, setItwGrams] = useState<number>(11) // Individual Tag Weight in grams
   const [batchName, setBatchName] = useState('')
   const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().slice(0, 10))
 
@@ -477,11 +479,14 @@ export default function SuperAdminPage() {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          batchName: batchName || `Batch ${new Date().toISOString().slice(0, 10)}`,
+          batchName: batchName || `Batch ${new Date().toISOString().slice(0, 10)} | ${filamentBrand} ${color} ${material} | ITW:${itwGrams}g BW:${(itwGrams * batchSize).toFixed(1)}g`,
           batchSize,
           model,
           material,
           color,
+          filamentBrand,
+          itwGrams,
+          batchWeightGrams: parseFloat((itwGrams * batchSize).toFixed(1)),
           chain: 'BASE',
           targetRanchId: null,
           kitMode: false,
@@ -734,6 +739,39 @@ export default function SuperAdminPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium mb-2">Filament Brand</label>
+                  <select
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white text-gray-900"
+                    value={filamentBrand}
+                    onChange={e => setFilamentBrand(e.target.value)}
+                  >
+                    <option>Bambu Lab</option>
+                    <option>eSUN</option>
+                    <option>Polymaker</option>
+                    <option>Hatchbox</option>
+                    <option>Prusament</option>
+                    <option>Overture</option>
+                    <option>Generic</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    ITW — Individual Tag Weight (g)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white text-gray-900"
+                    value={itwGrams}
+                    onChange={e => setItwGrams(parseFloat(e.target.value) || 0)}
+                    placeholder="11"
+                  />
+                  <p className="text-xs text-[var(--c4)] mt-1">
+                    Batch weight: <strong>{(itwGrams * batchSize).toFixed(1)}g</strong> ({((itwGrams * batchSize) / 1000).toFixed(3)}kg)
+                  </p>
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-2">Batch Name</label>
                   <input
                     type="text"
@@ -796,6 +834,11 @@ export default function SuperAdminPage() {
                       <p className="text-sm text-[var(--c4)]">
                         Created: {new Date(latestBatch.created_at).toLocaleString()}
                       </p>
+                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-[var(--c4)]">
+                        <span>🎨 {color} · {material} · {filamentBrand}</span>
+                        <span>⚖️ ITW: {itwGrams}g · Batch: {(itwGrams * batchSize).toFixed(1)}g ({((itwGrams * batchSize)/1000).toFixed(3)}kg)</span>
+                        <span>🖨️ {model}</span>
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[var(--c2)]">{latestBatch.tags.length}</div>
