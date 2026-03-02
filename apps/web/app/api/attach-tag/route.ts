@@ -207,7 +207,8 @@ export async function POST(request: NextRequest) {
     const { randomUUID } = await import('crypto')
     const claimToken = randomUUID()
 
-    const { error: updateError } = await supabase
+    // Try with claim_token first; if the column doesn't exist yet, retry without it
+    let { error: updateError } = await supabase
       .from('tags')
       .update({
         animal_id: animalId,
@@ -218,8 +219,24 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', tag.id)
 
+    if (updateError && updateError.code === '42703') {
+      // claim_token column not yet migrated — attach without it (ownership won't work until migration is run)
+      console.warn('[ATTACH-TAG] claim_token column missing, attaching without ownership token. Run: ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS claim_token UUID;')
+      const { error: retryError } = await supabase
+        .from('tags')
+        .update({
+          animal_id: animalId,
+          public_id: publicId,
+          ranch_id: tag.ranch_id || null,
+          status: 'attached',
+        })
+        .eq('id', tag.id)
+      updateError = retryError ?? null
+    }
+
     if (updateError) {
-      return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 })
+      console.error('[ATTACH-TAG] Failed to update tag:', updateError)
+      return NextResponse.json({ error: 'Failed to update tag', details: updateError.message }, { status: 500 })
     }
 
     // 5b. Write tag_id back to animal so the reverse lookup works

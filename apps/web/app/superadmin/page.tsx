@@ -271,9 +271,6 @@ function AssembleTab() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag_id: tagId, action, assembled_by: 'superadmin' }),
     })
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'superadmin/page.tsx:handleAction',message:'assemble action response',data:{tagId,action,status:res.status,ok:res.ok},hypothesisId:'H29',timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
       alert(`Action failed: ${err.error || err.message || 'Unknown error'}`)
@@ -284,7 +281,13 @@ function AssembleTab() {
 
   const handlePrint = (tagId: string, tag: any, phase: 'pre' | 'post') => {
     printSingleQR(tag)
-    setPrintState(prev => ({ ...prev, [tagId]: phase }))
+    // Only mark as printed after user confirms they actually sent the print job
+    setTimeout(() => {
+      const confirmed = window.confirm('Did the QR label print successfully?')
+      if (confirmed) {
+        setPrintState(prev => ({ ...prev, [tagId]: phase }))
+      }
+    }, 800)
   }
 
 
@@ -317,7 +320,7 @@ function AssembleTab() {
           {/* Summary counters */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="card text-center bg-blue-900/10 border border-blue-700/30">
-              <div className="text-3xl font-bold text-blue-400">{workflowTags.filter(t => t.status === 'on_chain_unclaimed').length}</div>
+              <div className="text-3xl font-bold text-blue-400">{workflowTags.filter(t => t.status === 'on_chain_unclaimed' || t.status === 'pre_identity').length}</div>
               <div className="text-xs text-[var(--c4)] mt-1">Ready to Assemble</div>
             </div>
             <div className="card text-center bg-yellow-900/10 border border-yellow-700/30">
@@ -325,8 +328,8 @@ function AssembleTab() {
               <div className="text-xs text-[var(--c4)] mt-1">Assembled</div>
             </div>
             <div className="card text-center bg-green-900/10 border border-green-700/30">
-              <div className="text-3xl font-bold text-green-400">0</div>
-              <div className="text-xs text-[var(--c4)] mt-1">Shipped</div>
+              <div className="text-3xl font-bold text-green-400">{workflowTags.filter(t => printState[t.id] === 'post').length}</div>
+              <div className="text-xs text-[var(--c4)] mt-1">Labels Printed</div>
             </div>
           </div>
 
@@ -1239,7 +1242,8 @@ export default function SuperAdminPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10">
-                      <th className="text-left py-2 px-3">Tag Code</th>
+                      <th className="text-left py-2 px-3">Tag</th>
+                      <th className="text-left py-2 px-3">Batch</th>
                       <th className="text-left py-2 px-3">Token Code</th>
                       <th className="text-left py-2 px-3">Status</th>
                       <th className="text-left py-2 px-3">On-Chain</th>
@@ -1254,6 +1258,13 @@ export default function SuperAdminPage() {
                       return (
                         <tr key={device.id} className="border-b border-white/5 hover:bg-white/5">
                           <td className="py-2 px-3 font-mono font-semibold">{device.tag_code || device.tag_id}</td>
+                          <td className="py-2 px-3">
+                            {device.batch_name ? (
+                              <span className="font-mono text-xs text-[var(--c2)]">{device.batch_name}</span>
+                            ) : (
+                              <span className="text-gray-500 text-xs">—</span>
+                            )}
+                          </td>
                           <td className="py-2 px-3">
                             {device.token_id ? (
                               <span className="font-mono text-xs text-[var(--c2)]">{formatTokenCode(device)}</span>
