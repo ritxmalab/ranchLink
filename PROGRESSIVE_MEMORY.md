@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-02-28 (session 2) | **Build:** bc20558 | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-02-25 (session 3) | **Build:** 6f7aaa4 | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -54,7 +54,7 @@ Factory (batch generation)
 - Animals: `AUS0001` to `AUS0005` (5 attached animals)
 - Token codes: `RL-XXX-[8 hex chars from mint_tx_hash]` or `RL-XXX-T[token_id]`
 
-### Animals (as of 2026-02-28)
+### Animals (as of 2026-02-25)
 | public_id | name | tag | token_id | on-chain |
 |-----------|------|-----|----------|----------|
 | AUS0001 | Gonzo | RL-001 | — | OFF |
@@ -62,6 +62,7 @@ Factory (batch generation)
 | AUS0003 | Rocket | RL-004 | — | OFF |
 | AUS0004 | Gonzo | RL-007 | #3 | ✅ ON |
 | AUS0005 | Bañu | RL-002 | #5 | ✅ ON |
+| AUS0006 | Gonz | (no tag) | — | OFF |
 
 ### Batches (as of 2026-02-28)
 | name | tags | notes |
@@ -92,6 +93,7 @@ Factory (batch generation)
 - `apps/web/app/api/retry-mint/route.ts` — Retry failed mints (superadmin only)
 - `apps/web/app/api/superadmin/assemble/route.ts` — Assembly pipeline actions
 - `apps/web/app/api/superadmin/devices/route.ts` — Tag inventory (GET/POST)
+- `apps/web/app/api/superadmin/migrate/route.ts` — DB migration status checker (returns SQL to run if columns missing)
 - `apps/web/app/api/animals/[id]/route.ts` — Animal detail (GET)
 - `apps/web/app/api/dashboard/animals/route.ts` — All animals for dashboard
 - `apps/web/app/api/upload-photo/route.ts` — Photo upload to Pinata
@@ -149,13 +151,15 @@ Print functions: `printSingleQR(tag)` and `printBatchQR(tags[])` in `superadmin/
 
 ## 8. Pending Actions (Manual)
 
-### CRITICAL — Run in Supabase SQL Editor:
+### CRITICAL — Run in Supabase SQL Editor (NOT YET DONE):
 ```sql
 -- https://supabase.com/dashboard/project/utovzxpmfnzihurotqnv/sql/new
 ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS claim_token UUID;
 NOTIFY pgrst, 'reload schema';
 ```
-This enables the farmer ownership system. Without it, ownership checks are permissive.
+This enables the farmer ownership system. Without it, ownership checks are permissive (attach still works via PGRST204 fallback, but ownership cookie won't be stored).
+
+**Verify status:** POST to `https://ranch-link.vercel.app/api/superadmin/migrate` (with superadmin cookie) to check if migration has been applied.
 
 ---
 
@@ -178,6 +182,12 @@ This enables the farmer ownership system. Without it, ownership checks are permi
 | — | a/[public_id]/page.tsx | Superadmin couldn't edit animals | ?superadmin=1 + cookie check |
 | — | dashboard/page.tsx | Photos not showing | photo_url in Animal interface + img tag |
 | — | api/animals/[id] | AUS0005 "Animal Not Found" | Removed invalid claim_token from select |
+| — | api/attach-tag | ERR_MM6VS10Z demo blocker | Fallback on PGRST204 (missing claim_token col) |
+| — | superadmin/page.tsx | Print cancel falsely marks "printed" | Confirm dialog after print window opens |
+| — | superadmin/page.tsx | Assemble counter showed 0 for pre_identity | Counter now includes pre_identity status |
+| — | superadmin/page.tsx | Batch name TST_ATX_270226 not visible in Inventory | Added Batch column to inventory table |
+| — | multiple files | localhost:7242 debug fetch calls in production | Removed from start, t/[tag_code], update-animal, superadmin |
+| — | api/attach-tag | PGRST204 fallback used wrong error code | Fixed to check both 42703 and PGRST204 |
 
 ---
 
@@ -214,11 +224,8 @@ Key vars (never commit values):
 
 ## 13. Open Issues (Not Yet Fixed)
 
-### Issue A — Print state falsely set on OS dialog cancel
-- **File:** `apps/web/app/superadmin/page.tsx` — `handlePrint()` / `printState`
-- **Problem:** `printState` is set to `'pre'` the moment the user clicks "Print QR", before confirming in the OS print dialog. If the user cancels the dialog, the platform incorrectly marks the tag as printed and unlocks the "Assemble" button.
-- **Impact:** Tags can be assembled without actually having a printed QR label.
-- **Proposed fix:** Replace the auto-set with an explicit confirmation prompt after the print window opens: "Did you successfully print this label? [Yes / No]"
+### Issue A — Print state falsely set on OS dialog cancel ✅ FIXED (session 3)
+- **Fix:** `handlePrint()` now opens the print window, waits 800ms, then shows "Did the QR label print successfully?" confirm dialog. Only marks printed if user confirms.
 
 ### Issue B — Security: sequential tag codes claimable without physical possession
 - **Problem:** Tag codes are sequential (`RL-001`, `RL-002`...) and the claim URL `/t/RL-029` is publicly accessible. Anyone who guesses or knows a tag code can claim a tag they don't physically own.
