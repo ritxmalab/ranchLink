@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-02-25 (session 3) | **Build:** 6f7aaa4 | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-02-25 (session 3 — closed) | **Build:** 10057ad | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -227,12 +227,79 @@ Key vars (never commit values):
 ### Issue A — Print state falsely set on OS dialog cancel ✅ FIXED (session 3)
 - **Fix:** `handlePrint()` now opens the print window, waits 800ms, then shows "Did the QR label print successfully?" confirm dialog. Only marks printed if user confirms.
 
-### Issue B — Security: sequential tag codes claimable without physical possession
-- **Problem:** Tag codes are sequential (`RL-001`, `RL-002`...) and the claim URL `/t/RL-029` is publicly accessible. Anyone who guesses or knows a tag code can claim a tag they don't physically own.
-- **Current protection:** Physical possession of the QR sticker is assumed, but not enforced technically.
-- **Impact:** A bad actor could claim all unclaimed tags before farmers receive them.
-- **Proposed solutions (in order of preference):**
-  1. **`claim_secret` in QR URL** — Generate a random secret per tag at batch creation, encode in QR as `/t/RL-029?s=abc123xyz`. Required to claim. Without the physical sticker, you can't get the secret. Low complexity, fits current architecture.
-  2. **Claim PIN on sticker** — Print a short random PIN on the sticker, required at claim time.
-  3. **NFC chip** — Physical tap required (hardware change).
-- **Status:** Not yet implemented. Tags should not be distributed until this is resolved for production use. Demo/internal use is acceptable.
+### Issue B — Security + Identity: full claim flow redesign (SESSION 4 SCOPE)
+
+#### The problem
+Tag codes are sequential (`RL-001`...`RL-029`) and the claim URL `/t/RL-029` is publicly accessible. Anyone who guesses a tag code can claim a tag without physical possession.
+
+#### Original design intent (to be restored)
+The QR sticker was always meant to encode a `claim_secret` — a random value generated at batch time that proves physical possession:
+```
+QR encodes:  https://ranch-link.vercel.app/t/RL-029?s=<claim_secret>
+Sticker shows (visible text): RL-029-A3F2B1C4  ← human-readable fallback for /start
+```
+The `claim_secret` is random, stored in DB, never derivable from the tag code alone.
+The token code (`RL-029-A3F2B1C4`) is the blockchain-derived human fallback — typed at `/start`.
+
+#### Agreed architecture for Session 4
+```
+Batch creation
+  → generate claim_secret (random UUID) per tag
+  → store in tags.claim_secret (new column)
+  → QR encodes: /t/RL-029?s=<claim_secret>
+  → token code (RL-029-A3F2B1C4) printed visibly on sticker as manual fallback
+
+Farmer scans QR → /t/RL-029?s=abc123
+  → system validates ?s= matches tags.claim_secret in DB
+  → if no match or missing → block with "Invalid tag" error
+  → if valid → show phone number input
+  → send SMS PIN (Twilio or similar)
+  → farmer enters PIN → identity confirmed
+  → proceed to animal form
+  → animal attached, custodial wallet created/linked
+  → farmer owns NFT, platform knows who holds which tag
+```
+
+#### What this does NOT change
+- Blockchain layer (anchorBatch, lazyMint, Merkle proofs) — untouched
+- Tag codes (RL-XXX) — still used as primary identifier
+- Token codes — still derived from mint_tx_hash at claim time
+- IPFS metadata — untouched
+
+#### Implementation steps (Session 4)
+1. Add `claim_secret` column to `tags` table (SQL migration)
+2. Generate `claim_secret` per tag in `factory/batches/route.ts` at batch creation
+3. Update QR URL generation to include `?s=<claim_secret>`
+4. Validate `?s=` param in `/t/[tag_code]/page.tsx` and `/api/attach-tag`
+5. Add phone number input + SMS PIN step before animal form
+6. Link phone to farmer record + custodial wallet in DB
+7. Update sticker print to show token code as visible fallback text
+
+#### Status
+Not yet implemented. Current batch (TST_ATX_270226, RL-012 to RL-029) does NOT have claim_secret. Safe for internal demo only — do not distribute publicly until implemented.
+
+
+---
+
+## 14. Session 4 — Kickoff Checklist
+
+Before writing any code, confirm these in order:
+
+### Pre-flight
+- [ ] Run Supabase SQL migration for `claim_token` (§8) — verify via `/api/superadmin/migrate`
+- [ ] Confirm TST_ATX_270226 tags (RL-012 to RL-029) are physically printed and in hand
+- [ ] Confirm Twilio (or SMS provider) account/credentials available for SMS PIN
+
+### Build order (do not skip steps)
+1. `tags.claim_secret` column migration
+2. Batch generation encodes `claim_secret` into QR URL
+3. `/t/[tag_code]` validates `?s=` before showing form
+4. Phone + SMS PIN gate before animal form
+5. Farmer/wallet record creation on PIN confirm
+6. Update sticker print layout with token code as visible fallback
+
+### Do NOT touch
+- `ranchLinkTag1155.ts` — blockchain layer is stable
+- `lib/ipfs/client.ts` — IPFS pinning is stable
+- `api/factory/batches/route.ts` Merkle tree logic — only add claim_secret generation
+- Any already-attached animals (AUS0001–AUS0006)
