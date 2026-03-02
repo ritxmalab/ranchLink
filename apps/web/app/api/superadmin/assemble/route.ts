@@ -103,8 +103,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
 
-  const res = await fetch(
-    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id,metadata_cid&order=created_at.desc`,
+  const baseSelect = 'id,tag_code,token_id,mint_tx_hash,contract_address,status,chain,assembled_at,shipped_at,assembled_by,created_at,batch_id,metadata_cid'
+  const selectWithBatch = `${baseSelect},batches(name,batch_name,material,color)`
+  let res = await fetch(
+    `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=${encodeURIComponent(selectWithBatch)}&order=created_at.desc`,
     {
       headers: {
         'apikey': serviceKey,
@@ -116,15 +118,39 @@ export async function GET(request: NextRequest) {
   )
 
   if (!res.ok) {
-    return NextResponse.json({ error: 'Database error' }, { status: 500 })
+    const errText = await res.text()
+    const tryWithoutBatch = /relationship|relation|embed|could not find/i.test(errText)
+    if (tryWithoutBatch) {
+      res = await fetch(
+        `${supabaseUrl}/rest/v1/tags?status=in.(on_chain_unclaimed,pre_identity,assembled)&select=${encodeURIComponent(baseSelect)}&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': serviceKey,
+            'Authorization': `Bearer ${serviceKey}`,
+            'Cache-Control': 'no-cache, no-store',
+          },
+          cache: 'no-store',
+        }
+      )
+    }
+    if (!res.ok) {
+      return NextResponse.json({ error: (await res.text()) || 'Database error' }, { status: 500 })
+    }
   }
 
   const tags = await res.json()
 
-  const enriched = (tags || []).map((t: any) => ({
-    ...t,
-    base_qr_url: `${appUrl}/t/${t.tag_code}`,
-  }))
+  const enriched = (tags || []).map((t: any) => {
+    const batch = t.batches ?? null
+    const { batches: _, ...rest } = t
+    return {
+      ...rest,
+      batch_name: batch?.name ?? batch?.batch_name ?? null,
+      material: batch?.material ?? null,
+      color: batch?.color ?? null,
+      base_qr_url: `${appUrl}/t/${t.tag_code}`,
+    }
+  })
 
   return NextResponse.json({ tags: enriched })
 }
