@@ -103,12 +103,20 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json', Prefer: 'return=representation',
     },
     body: JSON.stringify({
-      name: batchName, batch_name: batchName, model, material, color, chain,
-      count: batchSize, target_ranch_id: targetRanchId || null, status: 'anchoring',
-      // Physical specs — stored in batch manifest and IPFS
-      ...(filamentBrand && { filament_brand: filamentBrand }),
-      ...(itwGrams && { itw_grams: itwGrams }),
-      ...(batchWeightGrams && { batch_weight_grams: batchWeightGrams }),
+      name: batchName,
+      batch_name: batchName,
+      model,
+      material,
+      color,
+      chain,
+      count: batchSize,
+      target_ranch_id: targetRanchId || null,
+      status: 'anchoring',
+      // NOTE: Physical specs (filamentBrand, itwGrams, batchWeightGrams) are
+      // intentionally NOT stored in dedicated DB columns yet. They live in:
+      //   1) the batch manifest pinned to IPFS (see physicalSpecs below)
+      //   2) the human-readable material string edited in the superadmin UI.
+      // This keeps the DB schema stable for existing deployments.
     }),
   })
   const [batch] = await batchInsertRes.json()

@@ -151,13 +151,13 @@ Print functions: `printSingleQR(tag)` and `printBatchQR(tags[])` in `superadmin/
 
 ## 8. Pending Actions (Manual)
 
-### CRITICAL — Run in Supabase SQL Editor (NOT YET DONE):
+### CRITICAL — Supabase SQL migration (DONE):
 ```sql
 -- https://supabase.com/dashboard/project/utovzxpmfnzihurotqnv/sql/new
 ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS claim_token UUID;
 NOTIFY pgrst, 'reload schema';
 ```
-This enables the farmer ownership system. Without it, ownership checks are permissive (attach still works via PGRST204 fallback, but ownership cookie won't be stored).
+This enables the farmer ownership system. Migration has been run; attach-tag now stores claim_token and farmer cookies persist as designed.
 
 **Verify status:** POST to `https://ranch-link.vercel.app/api/superadmin/migrate` (with superadmin cookie) to check if migration has been applied.
 
@@ -286,7 +286,7 @@ Not yet implemented. Current batch (TST_ATX_270226, RL-012 to RL-029) does NOT h
 Before writing any code, confirm these in order:
 
 ### Pre-flight
-- [ ] Run Supabase SQL migration for `claim_token` (§8) — verify via `/api/superadmin/migrate`
+- [x] Run Supabase SQL migration for `claim_token` (§8) — verify via `/api/superadmin/migrate`
 - [ ] Confirm TST_ATX_270226 tags (RL-012 to RL-029) are physically printed and in hand
 - [ ] Confirm Twilio (or SMS provider) account/credentials available for SMS PIN
 
