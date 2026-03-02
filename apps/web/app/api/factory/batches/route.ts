@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
   const serviceKey  = process.env.SUPABASE_SERVICE_KEY!
   const appUrl      = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
 
-  // ── 1. Get next tag number ──────────────────────────────────────────────────
+  // ── 1. Get next tag number (find actual max, not most-recent by timestamp) ─
   const existingRes = await fetch(
-    `${supabaseUrl}/rest/v1/tags?select=tag_code&order=created_at.desc&limit=1`,
+    `${supabaseUrl}/rest/v1/tags?select=tag_code&order=tag_code.desc&limit=1`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Cache-Control': 'no-cache' }, cache: 'no-store' }
   )
   const existingTags = await existingRes.json()
