@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/dashboard/tags
  * Get tags for the current logged-in ranch user (v1.0)
@@ -47,9 +49,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({
-      tags: tags || [],
-    })
+    const res = NextResponse.json({ tags: tags || [] })
+    res.headers.set('Cache-Control', 'no-store, must-revalidate')
+    res.headers.set('Pragma', 'no-cache')
+    return res
   } catch (error: any) {
     console.error('Dashboard tags error:', error)
     return NextResponse.json(

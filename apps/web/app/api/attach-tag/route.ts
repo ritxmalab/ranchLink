@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }
 
-    // 2. Tag must be in a valid state for attachment
+    // 2. Tag must be in a valid state
     // v2.0: pre_identity tags (Merkle-anchored) are valid — they lazy-mint at attach time
     // v1.0: on_chain_unclaimed tags (already minted ERC-721) are valid
     const validStatuses = ['on_chain_unclaimed', 'pre_identity', 'assembled', 'in_inventory']
@@ -239,13 +239,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update tag', details: updateError.message }, { status: 500 })
     }
 
-    // 5b. Write tag_id back to animal so the reverse lookup works
+    // 5b. Write tag_id back to animal (required so dashboard and animal page show the tag)
     const { error: tagLinkError } = await supabase
       .from('animals')
       .update({ tag_id: tag.id })
       .eq('id', animalId)
     if (tagLinkError) {
       console.error('[ATTACH-TAG] Failed to write tag_id to animal:', tagLinkError.message)
+      return NextResponse.json(
+        { error: 'Failed to link tag to animal. Please try again.', details: tagLinkError.message },
+        { status: 500 }
+      )
     }
 
     // 6. Pin metadata to IPFS
@@ -352,7 +356,7 @@ export async function POST(request: NextRequest) {
       on_chain: !!tokenId,
     })
 
-    // Set claim_token cookie so the farmer's browser can edit this animal later
+    // Set claim_token cookie
     // Keyed by public_id so multiple animals can be owned on the same device
     response.cookies.set(`rl_owner_${publicId}`, claimToken, {
       httpOnly: false, // needs to be readable by client JS for the animal card

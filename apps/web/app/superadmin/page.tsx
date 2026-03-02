@@ -564,29 +564,34 @@ export default function SuperAdminPage() {
 
     try {
       // Call v1.0 factory endpoint
+      const body: Record<string, unknown> = {
+        batchName: batchName || `Batch ${new Date().toISOString().slice(0, 10)} | ${filamentBrand} ${color} ${material} | ITW:${itwGrams}g BW:${(itwGrams * batchSize).toFixed(1)}g`,
+        batchSize,
+        model,
+        material,
+        color,
+        chain: 'BASE',
+        targetRanchId: null,
+        kitMode: false,
+      }
+      if (filamentBrand) body.filamentBrand = filamentBrand
+      if (itwGrams != null) body.itwGrams = itwGrams
+      if (batchSize > 0 && itwGrams != null) body.batchWeightGrams = parseFloat((itwGrams * batchSize).toFixed(1))
+      // Omit kitSize — API schema expects number or undefined, not null; we're not in kit mode
+
       const response = await fetch('/api/factory/batches', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          batchName: batchName || `Batch ${new Date().toISOString().slice(0, 10)} | ${filamentBrand} ${color} ${material} | ITW:${itwGrams}g BW:${(itwGrams * batchSize).toFixed(1)}g`,
-          batchSize,
-          model,
-          material,
-          color,
-          filamentBrand,
-          itwGrams,
-          batchWeightGrams: parseFloat((itwGrams * batchSize).toFixed(1)),
-          chain: 'BASE',
-          targetRanchId: null,
-          kitMode: false,
-          kitSize: null,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate batch')
+        const detailsMsg = errorData.details?.length
+          ? ` (${errorData.details.map((d: any) => d.path?.join('.') + ': ' + d.message).join('; ')})`
+          : ''
+        throw new Error((errorData.error || 'Failed to generate batch') + detailsMsg)
       }
 
       const data = await response.json()

@@ -19,7 +19,7 @@ const batchSchema = z.object({
   chain: z.string().optional(),
   targetRanchId: z.string().uuid().optional().nullable(),
   kitMode: z.boolean().optional(),
-  kitSize: z.number().int().optional(),
+  kitSize: z.number().int().optional().nullable(),
 })
 
 /**

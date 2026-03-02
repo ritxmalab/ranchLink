@@ -12,7 +12,10 @@ export async function GET(
 ) {
   try {
     const { tag_code } = params
-    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/tags/[tag_code]/route.ts:GET',message:'tags GET received',data:{tag_code,tag_code_length:tag_code?.length},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_KEY
     
@@ -39,7 +42,11 @@ export async function GET(
     }
 
     const rows = await res.json()
-    
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/tags/[tag_code]/route.ts:after fetch',message:'tags DB result',data:{rowCount:rows?.length,tag_id:rows?.[0]?.id,tag_status:rows?.[0]?.status,tag_code_from_row:rows?.[0]?.tag_code},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
     }

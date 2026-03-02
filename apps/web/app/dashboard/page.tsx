@@ -84,6 +84,13 @@ export default function DashboardPage() {
     fetchDashboardData()
   }, [])
 
+  // Refetch when user returns to this tab so newly created animals show without manual refresh
+  useEffect(() => {
+    const onFocus = () => fetchDashboardData()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true)
@@ -93,8 +100,8 @@ export default function DashboardPage() {
       // TODO: LastBurner / Non-custodial Support
       // - Dashboard should show on-chain owner (server wallet for custodial, Burner address for non-custodial)
       // - Liquidity flows (USDC, sales) can be displayed per owner address
-      const animalsResponse = await fetch('/api/dashboard/animals')
-      const tagsResponse = await fetch('/api/dashboard/tags')
+      const animalsResponse = await fetch('/api/dashboard/animals', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } })
+      const tagsResponse = await fetch('/api/dashboard/tags', { cache: 'no-store', headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' } })
       
       const animalsData = await animalsResponse.json()
       const tagsData = await tagsResponse.json()
@@ -364,9 +371,14 @@ export default function DashboardPage() {
                             <span className="font-mono font-semibold">{tag.tag_code}</span>
                           </div>
                           {tag.token_id && (
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-[var(--c4)]">Token ID:</span>
-                              <span className="font-mono">#{tag.token_id}</span>
+                            <div className="flex items-center justify-between text-xs gap-2 min-w-0">
+                              <span className="text-[var(--c4)] flex-shrink-0">Token ID:</span>
+                              <span
+                                className="font-mono truncate text-right"
+                                title={`#${tag.token_id}`}
+                              >
+                                #{tag.token_id}
+                              </span>
                             </div>
                           )}
                           <div className="flex items-center justify-between text-xs">

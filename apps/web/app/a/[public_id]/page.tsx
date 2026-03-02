@@ -301,7 +301,17 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
               <>
                 <InfoRow label="Tag Code" value={tag.tag_code} />
                 <InfoRow label="Tag Status" value={tag.status.replace(/_/g, ' ')} />
-                <InfoRow label="Token ID" value={tag.token_id ? `#${tag.token_id}` : null} />
+                {tag.token_id && (
+                  <div className="flex justify-between items-center py-1.5 border-b border-white/5 gap-2">
+                    <span className="text-[var(--c4)] text-sm flex-shrink-0">Token ID</span>
+                    <span
+                      className="font-semibold text-sm text-right min-w-0 truncate"
+                      title={`#${tag.token_id}`}
+                    >
+                      #{tag.token_id}
+                    </span>
+                  </div>
+                )}
                 <InfoRow label="Chain" value={tag.chain} />
                 <div className="flex justify-between py-1.5">
                   <span className="text-[var(--c4)] text-sm">On-chain</span>
