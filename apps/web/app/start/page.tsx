@@ -111,9 +111,6 @@ export default function StartPage() {
     const isComplete = /^RL-\d{3,}$/i.test(t) || /^RL-\d{3,}-.{6,}/i.test(t) || /\/t\/RL-\d{3,}/i.test(t)
     if (!isComplete) return
     const code = extractTagCode(t)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'start/page.tsx:auto-redirect',message:'auto-redirect check',data:{input:t,code,isComplete},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{})
-    // #endregion
     if (code) router.push(`/t/${code}`)
   }, [formData.token, router])
 

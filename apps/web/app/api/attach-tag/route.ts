@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', tag.id)
 
-    if (updateError && updateError.code === '42703') {
+    if (updateError && (updateError.code === '42703' || updateError.code === 'PGRST204')) {
       // claim_token column not yet migrated — attach without it (ownership won't work until migration is run)
       console.warn('[ATTACH-TAG] claim_token column missing, attaching without ownership token. Run: ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS claim_token UUID;')
       const { error: retryError } = await supabase
