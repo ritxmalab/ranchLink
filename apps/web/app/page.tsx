@@ -57,10 +57,9 @@ export default function Home() {
           <div className="card text-center border border-[#1F2937] hover:border-[var(--c2)] transition-all overflow-hidden p-0">
             <div className="relative aspect-[4/3] overflow-hidden bg-[var(--c2)]/10">
               <img
-                src="/pricing-cards.png"
-                alt=""
-                className="absolute inset-0 w-[400%] max-w-none h-full object-cover object-left"
-                style={{ marginLeft: 0 }}
+                src="/1.png"
+                alt="Single tag"
+                className="absolute inset-0 w-full h-full object-contain"
               />
             </div>
             <div className="p-4 pt-4">
@@ -77,10 +76,9 @@ export default function Home() {
           <div className="card text-center border-2 border-[var(--c2)] shadow-2xl transform scale-105 bg-gradient-to-br from-[var(--bg-card)] to-[var(--bg-secondary)] overflow-hidden p-0">
             <div className="relative aspect-[4/3] overflow-hidden bg-[var(--c2)]/10">
               <img
-                src="/pricing-cards.png"
-                alt=""
-                className="absolute inset-0 w-[400%] max-w-none h-full object-cover"
-                style={{ marginLeft: '-100%' }}
+                src="/2.png"
+                alt="5-Pack"
+                className="absolute inset-0 w-full h-full object-contain"
               />
             </div>
             <div className="p-4 pt-4">
@@ -97,10 +95,9 @@ export default function Home() {
           <div className="card text-center border border-[#1F2937] hover:border-[var(--c2)] transition-all overflow-hidden p-0">
             <div className="relative aspect-[4/3] overflow-hidden bg-[var(--c2)]/10">
               <img
-                src="/pricing-cards.png"
-                alt=""
-                className="absolute inset-0 w-[400%] max-w-none h-full object-cover"
-                style={{ marginLeft: '-200%' }}
+                src="/3.png"
+                alt="Stack"
+                className="absolute inset-0 w-full h-full object-contain"
               />
             </div>
             <div className="p-4 pt-4">
@@ -117,10 +114,9 @@ export default function Home() {
           <div className="card text-center border border-[#1F2937] hover:border-[var(--c2)] transition-all overflow-hidden p-0">
             <div className="relative aspect-[4/3] overflow-hidden bg-[var(--c3)]/10">
               <img
-                src="/pricing-cards.png"
-                alt=""
-                className="absolute inset-0 w-[400%] max-w-none h-full object-cover"
-                style={{ marginLeft: '-300%' }}
+                src="/4.png"
+                alt="Custom"
+                className="absolute inset-0 w-full h-full object-contain"
               />
             </div>
             <div className="p-4 pt-4">
