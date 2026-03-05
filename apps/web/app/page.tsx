@@ -3,10 +3,10 @@
 import { useState } from 'react'
 
 const PRICING_TIERS = [
-  { id: 0, title: 'Single', price: '$3.39', img: '/1.png', imgInteraction: null, alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
-  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/2.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true },
-  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/6.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
-  { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: '/interaction/4.png', alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true },
+  { id: 0, title: 'Single', price: '$3.39', img: '/1.png', imgInteraction: null, alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
+  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/2.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true, isContact: false },
+  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/6.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
+  { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: '/interaction/4.png', alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true, priceGradient: false },
 ] as const
 
 export default function Home() {
@@ -75,7 +75,7 @@ export default function Home() {
                 onKeyDown={(e) => e.key === 'Enter' && setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 onClick={() => setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 className={`
-                  group text-left rounded-xl overflow-hidden transition-all duration-200 p-4 cursor-pointer
+                  pricing-card group text-left rounded-xl overflow-hidden transition-all duration-200 p-4 cursor-pointer
                   border-2
                   hover:border-[var(--c2)] hover:shadow-xl hover:shadow-[var(--c2)]/20
                   ${isSelected
@@ -88,13 +88,14 @@ export default function Home() {
                   <img
                     src={tier.img}
                     alt={tier.alt}
-                    className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-25 ${hasInteraction ? 'opacity-100 group-hover:opacity-0' : 'opacity-100'}`}
+                    className={`pricing-img-default absolute inset-0 w-full h-full object-contain ${hasInteraction ? '' : ''}`}
                   />
                   {hasInteraction && (
                     <img
                       src={tier.imgInteraction!}
                       alt={`${tier.alt} (interacción)`}
-                      className="absolute inset-0 w-full h-full object-contain opacity-0 transition-opacity duration-25 group-hover:opacity-100"
+                      className="pricing-img-interaction absolute inset-0 w-full h-full object-contain opacity-0"
+                      fetchPriority="high"
                     />
                   )}
                 </div>

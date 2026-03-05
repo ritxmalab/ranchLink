@@ -44,5 +44,24 @@
   .gradient-text {
     @apply bg-gradient-to-r from-[var(--c1)] via-[var(--c2)] to-[var(--c3)] bg-clip-text text-transparent;
   }
+  
+  /* Pricing card: image swap on hover - pure CSS, only when interaction image exists */
+  .pricing-card:has(.pricing-img-interaction):hover .pricing-img-default {
+    opacity: 0;
+  }
+  .pricing-card:has(.pricing-img-interaction):hover .pricing-img-interaction {
+    opacity: 1;
+  }
+  .pricing-img-default,
+  .pricing-img-interaction {
+    transition: opacity 25ms ease;
+  }
+  .pricing-img-interaction {
+    z-index: 1;
+    pointer-events: none;
+  }
+  .pricing-img-default {
+    z-index: 0;
+  }
 }
 
