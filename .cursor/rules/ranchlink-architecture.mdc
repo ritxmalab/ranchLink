@@ -10,6 +10,8 @@ alwaysApply: true
 **Supabase project:** utovzxpmfnzihurotqnv  
 **Vercel project:** ritxma-integrations-projects/ranch-link (id: prj_NxhdtgXobdqmE07duN86PnK8BeQ5)
 
+**Cómo saber si el deployment ya está:** Vercel Dashboard → [vercel.com](https://vercel.com) → tu equipo → proyecto **ranch-link** → pestaña **Deployments**. El último deployment debe estar en estado **Ready** (verde). También: después de un push a `main`, suele tardar 1–2 minutos; recarga la web con caché limpia (Cmd+Shift+R / Ctrl+Shift+R) para ver los cambios.
+
 ---
 
 ## Key Technical Constants (NEVER change these without confirmation)
@@ -224,6 +226,17 @@ At the start of any new session, I will:
 4. Report current state and pending next steps before touching anything
 
 **One-command resume:** "Resume RanchLink" — I will read this file + RANCHLINK_STATE.md and give a full briefing.
+
+---
+
+## Execution — UI and visible changes
+
+- **For visible changes, define done as: code + commit + push + verify.** Do not leave UI/visible changes only local; deployment is never skipped.
+- **Checklist (complete all before considering UI work done):**
+  1. **Code** — Implement the change (pages, components, assets, styling).
+  2. **Commit** — Stage and commit the relevant files with a clear message.
+  3. **Push** — Push to the deployment branch (e.g. `main`) so Vercel builds.
+  4. **Verify** — Confirm deploy (e.g. note production URL, or briefly check that the live site reflects the change). Production URL: https://ranch-link.vercel.app
 
 ---
 

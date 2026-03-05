@@ -15,6 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preload" href="/interaction/2.png" as="image" />
+        <link rel="preload" href="/interaction/4.png" as="image" />
+        <link rel="preload" href="/interaction/6.png" as="image" />
+      </head>
       <body className="font-sans">
         {/* Compliance Banner */}
         <div className="bg-gradient-to-r from-[var(--c2)] to-[var(--c3)] text-white text-center py-2 text-xs font-medium">
