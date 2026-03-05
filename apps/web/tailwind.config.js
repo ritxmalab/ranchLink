@@ -7,6 +7,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      transitionDuration: {
+        '25': '25ms',
+      },
       colors: {
         bg: '#F8F3E8',
         c1: '#2C241F',
