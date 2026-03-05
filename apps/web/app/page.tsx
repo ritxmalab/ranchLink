@@ -36,8 +36,8 @@ export default function Home() {
 
       {/* Banner card under hero */}
       <section className="container mx-auto px-4 sm:px-6 pb-10 max-w-full">
-        <div className="max-w-5xl mx-auto border-2 border-[var(--c2)] rounded-3xl md:rounded-2xl overflow-hidden bg-[var(--bg-card)] shadow-md">
-          <div className="grid md:grid-cols-[1.8fr_2fr] gap-0">
+        <div className="max-w-6xl mx-auto border-2 border-[var(--c2)] rounded-3xl md:rounded-2xl overflow-hidden bg-[var(--bg-card)] shadow-md">
+          <div className="grid md:grid-cols-[2.2fr_1.8fr] gap-0">
             <div className="relative overflow-hidden">
               <img
                 src="/banner-ranchlink.png"
@@ -51,7 +51,7 @@ export default function Home() {
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 text-[var(--c1)]">
                   We build livestock management that adapts to any given conditions of the environment.
                 </h2>
-                <p className="text-sm sm:text-base text-[var(--c4)] max-w-sm md:max-w-md">
+                <p className="text-sm sm:text-base text-[var(--c4)] max-w-sm md:max-w-md lg:max-w-lg">
                   Affordable custom device to monitor, track and manage real world data into real world assets.
                 </p>
               </div>
