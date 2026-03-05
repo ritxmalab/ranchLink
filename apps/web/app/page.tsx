@@ -1,9 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+
+const PRICING_TIERS = [
+  { id: 0, title: 'Single', price: '$3.39', img: '/1.png', imgInteraction: null, alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
+  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/2.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true },
+  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/6.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
+  { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: '/interaction/4.png', alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true },
+] as const
+
+const HOVER_DELAY_MS = 1000
 
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
+  const [interactionImageActive, setInteractionImageActive] = useState<Set<number>>(new Set())
+  const hoverTimersRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  const showInteraction = useCallback((id: number) => {
+    setInteractionImageActive((prev) => new Set(prev).add(id))
+  }, [])
+  const hideInteraction = useCallback((id: number) => {
+    setInteractionImageActive((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const handleMouseEnter = useCallback((id: number, hasInteraction: boolean) => {
+    if (!hasInteraction) return
+    hoverTimersRef.current[id] = setTimeout(() => showInteraction(id), HOVER_DELAY_MS)
+  }, [showInteraction])
+
+  const handleMouseLeave = useCallback((id: number) => {
+    if (hoverTimersRef.current[id]) {
+      clearTimeout(hoverTimersRef.current[id])
+      delete hoverTimersRef.current[id]
+    }
+    hideInteraction(id)
+  }, [hideInteraction])
+
+  const handleActionClick = useCallback((e: React.MouseEvent, id: number, hasInteraction: boolean) => {
+    e.stopPropagation()
+    if (hasInteraction) showInteraction(id)
+  }, [showInteraction])
 
   return (
     <main className="min-h-screen bg-[var(--bg)]">
@@ -57,20 +97,21 @@ export default function Home() {
       <section className="container mx-auto px-4 py-20">
         <h2 className="text-5xl font-bold text-center mb-12">Pricing</h2>
         <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto">
-          {[
-            { id: 0, title: 'Single', price: '$3.39', img: '/1.png', alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
-            { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true },
-            { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10' },
-            { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true },
-          ].map((tier) => {
+          {PRICING_TIERS.map((tier) => {
             const isSelected = selectedCard === tier.id
+            const showInt = interactionImageActive.has(tier.id)
+            const hasInteraction = tier.imgInteraction != null
             return (
-              <button
+              <div
                 key={tier.id}
-                type="button"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 onClick={() => setSelectedCard(selectedCard === tier.id ? null : tier.id)}
+                onMouseEnter={() => handleMouseEnter(tier.id, hasInteraction)}
+                onMouseLeave={() => handleMouseLeave(tier.id)}
                 className={`
-                  text-left rounded-xl overflow-hidden transition-all duration-200 p-4
+                  text-left rounded-xl overflow-hidden transition-all duration-200 p-4 cursor-pointer
                   border-2
                   hover:border-[var(--c2)] hover:shadow-xl hover:shadow-[var(--c2)]/20
                   ${isSelected
@@ -83,8 +124,15 @@ export default function Home() {
                   <img
                     src={tier.img}
                     alt={tier.alt}
-                    className="w-full h-full object-contain"
+                    className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-[25ms] ${showInt && hasInteraction ? 'opacity-0' : 'opacity-100'}`}
                   />
+                  {hasInteraction && (
+                    <img
+                      src={tier.imgInteraction!}
+                      alt={`${tier.alt} (interacción)`}
+                      className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-[25ms] ${showInt ? 'opacity-100' : 'opacity-0'}`}
+                    />
+                  )}
                 </div>
                 <div className="pt-4">
                   <h3 className="text-2xl font-bold mb-2">{tier.title}</h3>
@@ -96,8 +144,26 @@ export default function Home() {
                       <li key={f}>✓ {f}</li>
                     ))}
                   </ul>
+                  {hasInteraction && (
+                    <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={(e) => handleActionClick(e, tier.id, true)}
+                        className="flex-1 py-2 px-3 text-sm font-medium rounded-lg bg-[var(--c2)] text-white hover:opacity-90 transition-opacity"
+                      >
+                        Agregar al carrito
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleActionClick(e, tier.id, true)}
+                        className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors"
+                      >
+                        Comparar
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </button>
+              </div>
             )
           })}
         </div>
