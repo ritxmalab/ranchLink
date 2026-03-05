@@ -14,6 +14,15 @@
   --font-inter: 'Inter', system-ui, sans-serif;
 }
 
+/* Hide scrollbar for horizontal nav on mobile */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   body {
     @apply bg-[var(--bg)] text-[var(--c1)] font-sans;

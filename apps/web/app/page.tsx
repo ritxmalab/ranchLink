@@ -14,35 +14,35 @@ export default function Home() {
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
 
   return (
-    <main className="min-h-screen bg-[var(--bg)]">
+    <main className="min-h-screen bg-[var(--bg)] overflow-x-hidden">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-7xl font-bold mb-6 gradient-text">
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center max-w-full">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 gradient-text break-words">
           Tag. <span className="text-[var(--c2)]">Scan.</span> Done.
         </h1>
-        <p className="text-xl text-[var(--c4)] mb-8 max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg md:text-xl text-[var(--c4)] mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
           2-minute setup. Public Animal Card. Owner-only edits. Vet photos & proofs in one place.
         </p>
-        <div className="flex gap-4 justify-center flex-wrap">
-          <a href="/start" className="btn-primary text-lg px-8 py-4">
+        <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
+          <a href="/start" className="btn-primary text-sm sm:text-base px-4 sm:px-6 py-3 sm:py-4">
             📷 Scan Tag
           </a>
-          <a href="/start" className="btn-secondary">
+          <a href="/start" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
             Get Started
           </a>
-          <a href="/models" className="btn-secondary">
+          <a href="/models" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
             View Models
           </a>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="container mx-auto px-4 py-20">
-        <h2 className="text-4xl font-bold text-center mb-4">How It Works</h2>
-        <p className="text-center text-[var(--c4)] mb-12 max-w-2xl mx-auto">
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">How It Works</h2>
+        <p className="text-center text-sm sm:text-base text-[var(--c4)] mb-8 sm:mb-12 max-w-2xl mx-auto px-2">
           <strong>All tags work forever with the software.</strong> Optional refill service available. Custom capabilities available as separate service.
         </p>
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
           <div className="text-center">
             <div className="text-5xl mb-4">📱</div>
             <h3 className="text-xl font-semibold mb-2">Scan</h3>
@@ -62,9 +62,9 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section className="container mx-auto px-4 py-20">
-        <h2 className="text-5xl font-bold text-center mb-12">Pricing</h2>
-        <div className="grid md:grid-cols-4 gap-8 max-w-6xl mx-auto">
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-8 sm:mb-12">Pricing</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
           {PRICING_TIERS.map((tier) => {
             const isSelected = selectedCard === tier.id
             const hasInteraction = tier.imgInteraction != null
@@ -76,7 +76,7 @@ export default function Home() {
                 onKeyDown={(e) => e.key === 'Enter' && setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 onClick={() => setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 className={`
-                  pricing-card group text-left rounded-xl overflow-hidden transition-all duration-200 p-4 cursor-pointer
+                  pricing-card group text-left rounded-xl overflow-hidden transition-all duration-200 p-4 sm:p-4 cursor-pointer min-w-0
                   border-2
                   hover:border-[var(--c2)] hover:shadow-xl hover:shadow-[var(--c2)]/20
                   ${isSelected
@@ -101,8 +101,8 @@ export default function Home() {
                   )}
                 </div>
                 <div className="pt-4">
-                  <h3 className="text-2xl font-bold mb-2">{tier.title}</h3>
-                  <p className={`font-bold mb-4 ${tier.isContact ? 'text-lg text-[var(--c2)]' : `text-4xl ${tier.priceGradient ? 'gradient-text' : 'text-[var(--c2)]'}`}`}>
+                  <h3 className="text-xl sm:text-2xl font-bold mb-2">{tier.title}</h3>
+                  <p className={`font-bold mb-4 ${tier.isContact ? 'text-base sm:text-lg text-[var(--c2)]' : `text-3xl sm:text-4xl ${tier.priceGradient ? 'gradient-text' : 'text-[var(--c2)]'}`}`}>
                     {tier.price}
                   </p>
                   <ul className="text-sm text-[var(--c4)] space-y-2">
