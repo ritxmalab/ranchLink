@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-02-25 (session 3 — closed) | **Build:** 10057ad | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-02 (session 5 — batch fix, production batches, third-party claim) | **Build:** f7487d5 | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -50,27 +50,33 @@ Factory (batch generation)
 - RL-008 is the only assembled tag with a real token code (was individually minted earlier)
 
 ### Public IDs
-- Tags: `RL-001` to `RL-029` (29 total as of 2026-02-28)
-- Animals: `AUS0001` to `AUS0005` (5 attached animals)
+- Tags: `RL-001` through `RL-061+` (batch creation uses max tag_code for next number; no duplicates).
+- Animals: `AUS0001` to `AUS0008`+ (one per claimed tag; dashboard shows all).
 - Token codes: `RL-XXX-[8 hex chars from mint_tx_hash]` or `RL-XXX-T[token_id]`
 
-### Animals (as of 2026-02-25)
-| public_id | name | tag | token_id | on-chain |
-|-----------|------|-----|----------|----------|
-| AUS0001 | Gonzo | RL-001 | — | OFF |
-| AUS0002 | Gonzo | RL-003 | — | OFF |
-| AUS0003 | Rocket | RL-004 | — | OFF |
-| AUS0004 | Gonzo | RL-007 | #3 | ✅ ON |
-| AUS0005 | Bañu | RL-002 | #5 | ✅ ON |
-| AUS0006 | Gonz | (no tag) | — | OFF |
+### Animals (as of 2026-03-02)
+| public_id | name | tag | on-chain |
+|-----------|------|-----|----------|
+| AUS0008 | SOY VACA | RL-017 | ✅ ON (ERC-1155 lazy-minted) |
+| AUS0007 | Gonz | RL-028 | ✅ ON |
+| AUS0006 | Gonz | (no tag) | — |
+| AUS0005 | Bañu | RL-002 | ✅ ON |
+| AUS0004 | Gonzo | RL-007 | ✅ ON |
+| AUS0003 | Rocket | RL-004 | OFF |
+| AUS0002 | Gonzo | RL-003 | OFF |
+| AUS0001 | Gonzo | RL-001 | OFF |
 
-### Batches (as of 2026-02-28)
+**Dashboard count:** User expects **9 animals** on the public card dashboard. API currently returns 8; if a 9th (e.g. Thomas/Tomas from a Yellow-batch test claim) was claimed, it should appear after refetch or may need verification that the attach completed and animal row exists. All code is in place for full list (primary query + defensive merge by attached tags).
+
+### Batches (as of 2026-03-02)
 | name | tags | notes |
 |------|------|-------|
-| TST_ATX_270226 | RL-012 to RL-029 | Yellow PETG-HF, Bambu Lab, ITW:11g — NOT YET PRINTED (print cancelled) |
-| Legacy (no batch) | RL-001 to RL-011 | Older tags, no batch_id |
+| DEMOATXCFLIME-030226 | RL-042–RL-061 | Lime, 20 tags, PETG-HF, Bambu Lab, ITW 11g — production batch |
+| DEMOATXCF-030226 | (user batch) | User-generated; agent did NOT create production batches |
+| TST_ATX_270226 | RL-012–RL-029 | Yellow PETG-HF; 18 tags from this batch |
+| Legacy | RL-001–RL-011 | Older tags |
 
-> **Important:** The batch print dialog was opened and cancelled — tags are NOT physically printed yet. The platform incorrectly marked RL-008 print state in memory (see §13 open issues).
+**Tag numbering fix (2026-03-02):** Next tag number is derived from **max tag_code** (order by `tag_code.desc`), not `created_at`, so duplicate key errors no longer occur when batches are created out of order.
 
 ---
 
@@ -189,6 +195,15 @@ This enables the farmer ownership system. Migration has been run; attach-tag now
 | — | multiple files | localhost:7242 debug fetch calls in production | Removed from start, t/[tag_code], update-animal, superadmin |
 | — | api/attach-tag | PGRST204 fallback used wrong error code | Fixed to check both 42703 and PGRST204 |
 
+### Session 5 (2026-03-02) — Batch, dashboard, third-party claim
+| — | superadmin/page.tsx + api/factory/batches | "Invalid request" on Generate & Mint (kitSize: null) | Omit kitSize when not kit mode; API schema kitSize optional+nullable |
+| — | api/factory/batches/route.ts | Duplicate tag_code (e.g. RL-013) on new batch | Next number from max tag_code (order tag_code.desc), not created_at |
+| — | api/debug/tag/[tag_code]/route.ts | Duplicate handler block caused build failure | Removed second copy of GET handler |
+| — | api/dashboard/animals/route.ts | Debug instrumentation in production | Removed agent log region and ingest fetch |
+| — | dashboard/page.tsx | Long token IDs wrapped on cards | Truncate + title tooltip (min-w-0, truncate, title=#token_id) |
+| — | api/attach-tag/route.ts | Tag write-back failure silent | Return 500 with clear error if tag_id update fails |
+| — | a/[public_id]/page.tsx | Token ID row wrapped on animal card | Custom div with min-w-0 truncate + title (no change to photo) |
+
 ---
 
 ## 10. Contracts
@@ -303,3 +318,19 @@ Before writing any code, confirm these in order:
 - `lib/ipfs/client.ts` — IPFS pinning is stable
 - `api/factory/batches/route.ts` Merkle tree logic — only add claim_secret generation
 - Any already-attached animals (AUS0001–AUS0006)
+
+---
+
+## 15. Session 5 — Policy & Production Notes (2026-03-02)
+
+### Batch creation
+- **Do not create batches for the user.** The user runs their own production batches (e.g. 80 tags) with their own settings, colors, and numbers. The assistant should only fix bugs and verify flows, not run "Generate & Mint" with real batch sizes on their behalf.
+
+### Third-party claim (SOY VACA)
+- An entrepreneur (farmer) was given one of the 18 Yellow tags and claimed as **SOY VACA** (AUS0008, RL-017). Claim processed correctly: on-chain lazy mint, photo on IPFS, animal card public. All content is **Ritxma IP**. Farmers have **no superadmin access** — only owner cookie for editing their own animal; dashboard/marketplace/animal cards are intentionally public.
+
+### Production batch size
+- **80-tag batches** are supported: one Merkle anchor tx per batch, tag inserts in chunks of 100, `maxDuration = 60`. Tag numbering uses max `tag_code` so duplicate codes no longer occur.
+
+### Dashboard animal count
+- User expects **9 animals** on the public dashboard. If the API returns 8, the 9th may be Thomas/Tomas (test claim from Yellow batch) — confirm attach completed and animal has `tag_id` / is included in dashboard merge. Logic: primary query from `animals` plus animals linked from `tags` (status attached, animal_id not null); merged by id, sorted by `created_at` desc; refetch on window focus.

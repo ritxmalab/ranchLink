@@ -35,33 +35,33 @@ export default function Home() {
       </section>
 
       {/* How It Works — blue tag left (floating + rotating), steps right */}
-      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full">
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">How It Works</h2>
         <p className="text-center text-sm sm:text-base text-[var(--c4)] mb-8 sm:mb-12 max-w-2xl mx-auto px-2">
           <strong>All tags work forever with the software.</strong> Optional refill service available. Custom capabilities available as separate service.
         </p>
-        <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 max-w-4xl mx-auto">
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center justify-items-start gap-3 sm:gap-8 md:gap-14 max-w-5xl mx-auto w-full">
           <InteractiveCattleTag />
-          <div className="flex flex-col gap-6 sm:gap-8 w-full max-w-sm">
-            <div className="flex items-start gap-4 text-left">
-              <div className="text-4xl sm:text-5xl flex-shrink-0">📱</div>
-              <div>
-                <h3 className="text-xl font-semibold mb-1">Scan</h3>
-                <p className="text-[var(--c4)] text-sm sm:text-base">Scan QR code on your tag</p>
+          <div className="flex flex-col gap-2 sm:gap-6 md:gap-8 min-w-0 w-full">
+            <div className="flex items-start gap-2 sm:gap-4 text-left min-w-0">
+              <div className="text-2xl sm:text-5xl flex-shrink-0">📱</div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-xl font-semibold mb-0.5 sm:mb-1">Scan</h3>
+                <p className="text-[var(--c4)] text-xs sm:text-base">Scan QR code on your tag</p>
               </div>
             </div>
-            <div className="flex items-start gap-4 text-left">
-              <div className="text-4xl sm:text-5xl flex-shrink-0">✅</div>
-              <div>
-                <h3 className="text-xl font-semibold mb-1">Claim</h3>
-                <p className="text-[var(--c4)] text-sm sm:text-base">Claim your tag in 2 minutes</p>
+            <div className="flex items-start gap-2 sm:gap-4 text-left min-w-0">
+              <div className="text-2xl sm:text-5xl flex-shrink-0">✅</div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-xl font-semibold mb-0.5 sm:mb-1">Claim</h3>
+                <p className="text-[var(--c4)] text-xs sm:text-base">Claim your tag in 2 minutes</p>
               </div>
             </div>
-            <div className="flex items-start gap-4 text-left">
-              <div className="text-4xl sm:text-5xl flex-shrink-0">👁️</div>
-              <div>
-                <h3 className="text-xl font-semibold mb-1">View</h3>
-                <p className="text-[var(--c4)] text-sm sm:text-base">Public card for your animal</p>
+            <div className="flex items-start gap-2 sm:gap-4 text-left min-w-0">
+              <div className="text-2xl sm:text-5xl flex-shrink-0">👁️</div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-xl font-semibold mb-0.5 sm:mb-1">View</h3>
+                <p className="text-[var(--c4)] text-xs sm:text-base">Public card for your animal</p>
               </div>
             </div>
           </div>
@@ -69,7 +69,7 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full">
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto">
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-8 sm:mb-12">Pricing</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
           {PRICING_TIERS.map((tier) => {
