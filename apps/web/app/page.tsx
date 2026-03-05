@@ -5,8 +5,8 @@ import { useState } from 'react'
 /* Single→1 orange, 5-Pack→5 orange, Stack→10 orange (ex-Custom), Custom: vacía */
 const PRICING_TIERS = [
   { id: 0, title: 'Single', price: '$3.39', img: '/1.png', imgInteraction: '/interaction/2.png', alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
-  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/6.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true, isContact: false },
-  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/4.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
+  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/4.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true, isContact: false },
+  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/6.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
   { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: null, alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true, priceGradient: false },
 ] as const
 
