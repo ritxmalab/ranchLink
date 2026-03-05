@@ -70,7 +70,7 @@ export default function Home() {
                 type="button"
                 onClick={() => setSelectedCard(selectedCard === tier.id ? null : tier.id)}
                 className={`
-                  text-left rounded-xl overflow-hidden transition-all duration-200
+                  text-left rounded-xl overflow-hidden transition-all duration-200 p-4
                   border-2
                   hover:border-[var(--c2)] hover:shadow-xl hover:shadow-[var(--c2)]/20
                   ${isSelected
@@ -79,14 +79,14 @@ export default function Home() {
                   }
                 `}
               >
-                <div className={`relative aspect-[4/3] overflow-hidden p-3 ${tier.imgBg}`}>
+                <div className={`relative aspect-[4/3] overflow-hidden rounded-lg p-2 ${tier.imgBg}`}>
                   <img
                     src={tier.img}
                     alt={tier.alt}
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div className="p-5 pt-4">
+                <div className="pt-4">
                   <h3 className="text-2xl font-bold mb-2">{tier.title}</h3>
                   <p className={`font-bold mb-4 ${tier.isContact ? 'text-lg text-[var(--c2)]' : `text-4xl ${tier.priceGradient ? 'gradient-text' : 'text-[var(--c2)]'}`}`}>
                     {tier.price}
