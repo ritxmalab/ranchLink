@@ -9,7 +9,7 @@ const PRICING_TIERS = [
   { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: '/interaction/4.png', alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true },
 ] as const
 
-const HOVER_DELAY_MS = 1000
+const HOVER_DELAY_MS = 0
 
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
