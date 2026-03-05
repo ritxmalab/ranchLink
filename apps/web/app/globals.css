@@ -55,6 +55,8 @@
   .pricing-img-default,
   .pricing-img-interaction {
     transition: opacity 25ms ease;
+    object-fit: contain;
+    object-position: center;
   }
   .pricing-img-interaction {
     z-index: 1;
