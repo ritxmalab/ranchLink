@@ -34,6 +34,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Banner card under hero */}
+      <section className="container mx-auto px-4 sm:px-6 pb-10 max-w-full">
+        <div className="max-w-5xl mx-auto border-2 border-[var(--c2)] rounded-3xl overflow-hidden bg-[var(--bg-card)] shadow-md">
+          <div className="grid md:grid-cols-[1.6fr_2fr] gap-0">
+            <div className="relative overflow-hidden">
+              <img
+                src="/banner-ranchlink.png"
+                alt="Livestock with RanchLink tags"
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+            <div className="flex flex-col justify-between p-5 sm:p-6 md:p-8 gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3 text-[var(--c1)]">
+                  We build livestock management that adapts to any given conditions of the environment.
+                </h2>
+                <p className="text-sm sm:text-base text-[var(--c4)] max-w-md">
+                  Affordable custom device to monitor, track and manage real world data into real world assets.
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <a
+                  href="/start"
+                  className="inline-flex items-center justify-center px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[var(--c2)] text-white text-sm sm:text-base font-semibold shadow hover:bg-[#E55A2B] transition-colors"
+                >
+                  make it real
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works — blue tag left (floating + rotating), steps right */}
       <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">How It Works</h2>

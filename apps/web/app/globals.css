@@ -92,26 +92,21 @@
   animation: cattle-tag-float 4s ease-in-out infinite;
 }
 
-/* Lightweight 3D floating tag: gentle float + slow tilt, no flat spin */
+/* Lightweight 3D floating tag: clearly visible 3D tilt + float (always animates) */
 @keyframes cattle-tag-float-3d {
   0%, 100% {
-    transform: translateY(0) rotateX(6deg) rotateY(-10deg);
+    transform: translateY(0) rotateX(12deg) rotateY(-18deg);
   }
   25% {
-    transform: translateY(-6px) rotateX(2deg) rotateY(-2deg);
+    transform: translateY(-10px) rotateX(4deg) rotateY(-4deg);
   }
   50% {
-    transform: translateY(0) rotateX(0deg) rotateY(8deg);
+    transform: translateY(0) rotateX(0deg) rotateY(16deg);
   }
   75% {
-    transform: translateY(-6px) rotateX(-2deg) rotateY(-2deg);
+    transform: translateY(-10px) rotateX(-4deg) rotateY(-4deg);
   }
 }
 .animate-float-3d {
-  animation: cattle-tag-float-3d 16s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .animate-float-3d {
-    animation: cattle-tag-float 4s ease-in-out infinite;
-  }
+  animation: cattle-tag-float-3d 12s ease-in-out infinite;
 }
