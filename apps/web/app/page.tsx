@@ -19,9 +19,6 @@ export default function Home() {
           <a href="/models" className="btn-secondary">
             View Models
           </a>
-          <a href="/market" className="btn-secondary">
-            Browse Tags
-          </a>
         </div>
       </section>
 

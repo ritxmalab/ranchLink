@@ -11,7 +11,6 @@ export default function Navigation() {
     { href: '/models', label: 'Models' },
     { href: '/start', label: 'Claim Tag' },
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/market', label: 'Marketplace' },
     { href: '/superadmin', label: 'Factory', admin: true },
   ]
 
