@@ -110,22 +110,20 @@ export default function Home() {
                       <li key={f}>✓ {f}</li>
                     ))}
                   </ul>
-                  {hasInteraction && (
-                    <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="flex-1 py-2 px-3 text-sm font-medium rounded-lg bg-[var(--c2)] text-white hover:opacity-90 transition-opacity"
-                      >
-                        Agregar al carrito
-                      </button>
-                      <button
-                        type="button"
-                        className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors"
-                      >
-                        Comparar
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="flex-1 py-2 px-3 text-sm font-medium rounded-lg bg-[var(--c2)] text-white hover:opacity-90 transition-opacity"
+                    >
+                      Add to cart
+                    </button>
+                    <button
+                      type="button"
+                      className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors"
+                    >
+                      Compare
+                    </button>
+                  </div>
                 </div>
               </div>
             )
