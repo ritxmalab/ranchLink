@@ -121,7 +121,7 @@ export default function Home() {
                       type="button"
                       className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors"
                     >
-                      Compare
+                      Buy
                     </button>
                   </div>
                 </div>
