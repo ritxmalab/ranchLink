@@ -13,6 +13,40 @@ const PRICING_TIERS = [
 
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<number | null>(null)
+  const [buyingTierId, setBuyingTierId] = useState<number | null>(null)
+
+  const startCheckout = async (tierId: number) => {
+    const tierKey = tierId === 0 ? 'single' : tierId === 1 ? 'five_pack' : tierId === 2 ? 'stack' : null
+
+    if (!tierKey) return
+
+    try {
+      setBuyingTierId(tierId)
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: tierKey }),
+      })
+
+      if (!res.ok) {
+        console.error('Checkout failed with status', res.status)
+        alert('Could not start checkout. Please try again.')
+        return
+      }
+
+      const data = (await res.json()) as { url?: string }
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        alert('Could not start checkout. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error starting checkout', error)
+      alert('Could not start checkout. Please try again.')
+    } finally {
+      setBuyingTierId(null)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[var(--bg)] overflow-x-hidden">
@@ -160,9 +194,11 @@ export default function Home() {
                     </button>
                     <button
                       type="button"
-                      className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors"
+                      className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={buyingTierId === tier.id}
+                      onClick={() => startCheckout(tier.id)}
                     >
-                      Buy
+                      {buyingTierId === tier.id ? 'Redirecting…' : 'Buy'}
                     </button>
                   </div>
                 </div>
