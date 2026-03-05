@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import InteractiveCattleTag from '@/components/InteractiveCattleTag'
 
 /* Single→1 orange, 5-Pack→5 orange, Stack→10 orange (ex-Custom), Custom: vacía */
 const PRICING_TIERS = [
@@ -30,33 +31,39 @@ export default function Home() {
           <a href="/start" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
             Get Started
           </a>
-          <a href="/models" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
-            View Models
-          </a>
         </div>
       </section>
 
-      {/* How It Works */}
+      {/* How It Works — blue tag left (floating + rotating), steps right */}
       <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">How It Works</h2>
         <p className="text-center text-sm sm:text-base text-[var(--c4)] mb-8 sm:mb-12 max-w-2xl mx-auto px-2">
           <strong>All tags work forever with the software.</strong> Optional refill service available. Custom capabilities available as separate service.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
-          <div className="text-center">
-            <div className="text-5xl mb-4">📱</div>
-            <h3 className="text-xl font-semibold mb-2">Scan</h3>
-            <p className="text-[var(--c4)]">Scan QR code on your tag</p>
-          </div>
-          <div className="text-center">
-            <div className="text-5xl mb-4">✅</div>
-            <h3 className="text-xl font-semibold mb-2">Claim</h3>
-            <p className="text-gray-600">Claim your tag in 2 minutes</p>
-          </div>
-          <div className="text-center">
-            <div className="text-5xl mb-4">👁️</div>
-            <h3 className="text-xl font-semibold mb-2">View</h3>
-            <p className="text-gray-600">Public card for your animal</p>
+        <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 max-w-4xl mx-auto">
+          <InteractiveCattleTag />
+          <div className="flex flex-col gap-6 sm:gap-8 w-full max-w-sm">
+            <div className="flex items-start gap-4 text-left">
+              <div className="text-4xl sm:text-5xl flex-shrink-0">📱</div>
+              <div>
+                <h3 className="text-xl font-semibold mb-1">Scan</h3>
+                <p className="text-[var(--c4)] text-sm sm:text-base">Scan QR code on your tag</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 text-left">
+              <div className="text-4xl sm:text-5xl flex-shrink-0">✅</div>
+              <div>
+                <h3 className="text-xl font-semibold mb-1">Claim</h3>
+                <p className="text-[var(--c4)] text-sm sm:text-base">Claim your tag in 2 minutes</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 text-left">
+              <div className="text-4xl sm:text-5xl flex-shrink-0">👁️</div>
+              <div>
+                <h3 className="text-xl font-semibold mb-1">View</h3>
+                <p className="text-[var(--c4)] text-sm sm:text-base">Public card for your animal</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
