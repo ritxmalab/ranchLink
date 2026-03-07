@@ -61,9 +61,9 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[var(--bg)] overflow-x-hidden">
-      {/* Banner — top, ~98% width */}
-      <section className="w-[98%] max-w-[98vw] mx-auto px-2 sm:px-4 pt-4 sm:pt-6 pb-6 sm:pb-10">
-        <div className="w-full border-2 border-[var(--c2)] rounded-3xl md:rounded-2xl overflow-hidden bg-[var(--bg-card)] shadow-md">
+      {/* Banner — top, basically full width */}
+      <section className="w-full max-w-none px-2 sm:px-3 pt-4 sm:pt-6 pb-6 sm:pb-10">
+        <div className="w-full border-2 border-[var(--c2)] rounded-2xl sm:rounded-3xl overflow-hidden bg-[var(--bg-card)] shadow-md">
           <div className="grid md:grid-cols-[2.2fr_1.8fr] gap-0">
             <div className="relative overflow-hidden">
               <img
