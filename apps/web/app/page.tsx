@@ -61,34 +61,16 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[var(--bg)] overflow-x-hidden">
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center max-w-full">
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 gradient-text break-words">
-          Tag. <span className="text-[var(--c2)]">Scan.</span> Done.
-        </h1>
-        <p className="text-base sm:text-lg md:text-xl text-[var(--c4)] mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
-          2-minute setup. Public Animal Card. Owner-only edits. Vet photos & proofs in one place.
-        </p>
-        <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
-          <a href="/start" className="btn-primary text-sm sm:text-base px-4 sm:px-6 py-3 sm:py-4">
-            📷 Scan Tag
-          </a>
-          <a href="/start" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
-            Get Started
-          </a>
-        </div>
-      </section>
-
-      {/* Banner card under hero */}
-      <section className="container mx-auto px-4 sm:px-6 pb-10 max-w-full">
-        <div className="max-w-6xl mx-auto border-2 border-[var(--c2)] rounded-3xl md:rounded-2xl overflow-hidden bg-[var(--bg-card)] shadow-md">
+      {/* Banner — top, ~98% width */}
+      <section className="w-[98%] max-w-[98vw] mx-auto px-2 sm:px-4 pt-4 sm:pt-6 pb-6 sm:pb-10">
+        <div className="w-full border-2 border-[var(--c2)] rounded-3xl md:rounded-2xl overflow-hidden bg-[var(--bg-card)] shadow-md">
           <div className="grid md:grid-cols-[2.2fr_1.8fr] gap-0">
             <div className="relative overflow-hidden">
               <img
                 src="/banner-ranchlink.png"
                 alt="Livestock with RanchLink tags"
                 className="w-full h-full object-cover"
-                loading="lazy"
+                loading="eager"
               />
             </div>
             <div className="flex flex-col justify-between p-5 sm:p-6 md:p-8 gap-4">
@@ -110,6 +92,24 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Tag scan / Hero section — below banner */}
+      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center max-w-full">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 gradient-text break-words">
+          Tag. <span className="text-[var(--c2)]">Scan.</span> Done.
+        </h1>
+        <p className="text-base sm:text-lg md:text-xl text-[var(--c4)] mb-6 sm:mb-8 max-w-2xl mx-auto px-2">
+          2-minute setup. Public Animal Card. Owner-only edits. Vet photos & proofs in one place.
+        </p>
+        <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
+          <a href="/start" className="btn-primary text-sm sm:text-base px-4 sm:px-6 py-3 sm:py-4">
+            📷 Scan Tag
+          </a>
+          <a href="/start" className="btn-secondary text-sm sm:text-base px-4 sm:px-6 py-3">
+            Get Started
+          </a>
         </div>
       </section>
 
