@@ -8,6 +8,8 @@ export default function Navigation() {
 
   const navItems = [
     { href: '/', label: 'Home' },
+    { href: '/#pricing', label: 'Pricing' },
+    { href: '/#how', label: 'How It Works' },
     { href: '/models', label: 'Models' },
     { href: '/start', label: 'Claim Tag' },
     { href: '/dashboard', label: 'Dashboard' },

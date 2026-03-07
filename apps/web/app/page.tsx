@@ -2,26 +2,37 @@
 
 import { useState } from 'react'
 import InteractiveCattleTag from '@/components/InteractiveCattleTag'
+import ProductCard from '@/components/ProductCard'
 
-/* Single→1 orange, 5-Pack→5 orange, Stack→10 orange (ex-Custom), Custom: vacía */
-const PRICING_TIERS = [
-  { id: 0, title: 'Single', price: '$3.39', img: '/1.png', imgInteraction: '/interaction/2.png', alt: 'Single tag', features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
-  { id: 1, title: '5-Pack', price: '$14.99', img: '/2.png', imgInteraction: '/interaction/4.png', alt: '5-Pack', features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', priceGradient: true, isContact: false },
-  { id: 2, title: 'Stack', price: '$27.49', img: '/3.png', imgInteraction: '/interaction/6.png', alt: 'Stack', features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], imgBg: 'bg-[var(--c2)]/10', isContact: false, priceGradient: false },
-  { id: 3, title: 'Custom', price: 'Contact Us', img: '/4.png', imgInteraction: null, alt: 'Custom', features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], imgBg: 'bg-[var(--c3)]/10', isContact: true, priceGradient: false },
-] as const
+const PRODUCTS_BASE = '/products'
+
+/** Main pricing (digital/service) + physical catalog. Each item has 2–3 images (A/B/C). */
+const PRODUCT_CATALOG = [
+  // —— Main pricing (Stripe) ——
+  { id: '0', title: 'Single', nameCode: undefined, price: '$3.39', material: undefined, itemCount: undefined, features: ['1 QR tag', 'Public card', 'NFT ownership', 'Optional refill service'], images: ['/1.png', '/interaction/2.png'], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'single' as const },
+  { id: '1', title: '5-Pack', nameCode: undefined, price: '$14.99', material: undefined, itemCount: undefined, features: ['5 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], images: ['/2.png', '/interaction/4.png'], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'five_pack' as const },
+  { id: '2', title: 'Stack', nameCode: undefined, price: '$27.49', material: undefined, itemCount: undefined, features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], images: ['/3.png', '/interaction/6.png'], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'stack' as const },
+  { id: '3', title: 'Custom', nameCode: undefined, price: 'Contact Us', material: undefined, itemCount: undefined, features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], images: ['/4.png'], imgBg: 'bg-[var(--c3)]/10', isContact: true, stripeTierKey: null },
+  // —— Physical / labels (from design ref + zip) ——
+  { id: 'label-100', title: 'RanchLink Label', nameCode: 'RL-LABEL', price: '$9.99', material: undefined, itemCount: 100, features: ['Batch of 100', 'QR labels'], images: [`${PRODUCTS_BASE}/RL-LABEL.svg`], imgBg: 'bg-[var(--bg-secondary)]', isContact: false, stripeTierKey: null },
+  { id: 'tpp-1', title: 'Translucid PETG', nameCode: 'RL-TPP', price: '$1.99', material: 'Translucid PETG', itemCount: 1, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-A.png`, `${PRODUCTS_BASE}/RL-TPP-B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+  { id: 'tpp-5', title: 'Translucid PETG 5-Pack', nameCode: 'RL-TPP-5', price: '$6.99', material: 'Translucid PETG', itemCount: 5, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-4A.png`, `${PRODUCTS_BASE}/RL-TPP-4B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+  { id: 'tpp-15', title: 'Translucid PETG 15-Pack', nameCode: 'RL-TPP-15', price: '$31.89', material: 'Translucid PETG', itemCount: 15, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-15A.png`, `${PRODUCTS_BASE}/RL-TPP-15B.png`, `${PRODUCTS_BASE}/RL-TPP-15C.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+  { id: 'o-3', title: 'Orange 3-Pack', nameCode: 'RL-O-3', price: '$3.33', material: 'PETG-HF', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-O-3A.png`, `${PRODUCTS_BASE}/RL-O-3B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+  { id: 'ya-3', title: 'Yellow ABS 3-Pack', nameCode: 'RL-YA-3', price: '$3.99', material: 'ABS', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-YA%2B-3A.png`, `${PRODUCTS_BASE}/RL-YA%2B-3B.png`], imgBg: 'bg-[var(--c3)]/10', isContact: false, stripeTierKey: null },
+  { id: 'fb-3', title: 'Fluorescent PETG 3-Pack', nameCode: 'RL-FB', price: '$3.99', material: 'Fluorescent PETG', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-FBA.png`, `${PRODUCTS_BASE}/RL-FBB.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+]
 
 export default function Home() {
-  const [selectedCard, setSelectedCard] = useState<number | null>(null)
-  const [buyingTierId, setBuyingTierId] = useState<number | null>(null)
+  const [selectedCard, setSelectedCard] = useState<string | null>(null)
+  const [buyingTierId, setBuyingTierId] = useState<string | null>(null)
 
-  const startCheckout = async (tierId: number) => {
-    const tierKey = tierId === 0 ? 'single' : tierId === 1 ? 'five_pack' : tierId === 2 ? 'stack' : null
-
+  const startCheckout = async (productId: string) => {
+    const tierKey = productId === '0' ? 'single' : productId === '1' ? 'five_pack' : productId === '2' ? 'stack' : null
     if (!tierKey) return
 
     try {
-      setBuyingTierId(tierId)
+      setBuyingTierId(productId)
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +114,7 @@ export default function Home() {
       </section>
 
       {/* How It Works — blue tag left (floating + rotating), steps right */}
-      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto">
+      <section id="how" className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto bg-[var(--bg-secondary)]/50 scroll-mt-20">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">How It Works</h2>
         <p className="text-center text-sm sm:text-base text-[var(--c4)] mb-8 sm:mb-12 max-w-2xl mx-auto px-2">
           <strong>All tags work forever with the software.</strong> Optional refill service available. Custom capabilities available as separate service.
@@ -132,79 +143,50 @@ export default function Home() {
                 <p className="text-[var(--c4)] text-xs sm:text-base">Public card for your animal</p>
               </div>
             </div>
+            <div className="flex items-start gap-2 sm:gap-4 text-left min-w-0">
+              <div className="text-2xl sm:text-5xl flex-shrink-0">🛒</div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-xl font-semibold mb-0.5 sm:mb-1">Get tags</h3>
+                <p className="text-[var(--c4)] text-xs sm:text-base">
+                  <a href="/#pricing" className="text-[var(--c2)] hover:underline font-medium">Single, 5-Pack, Stack, or Custom</a>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full overflow-x-auto">
+      {/* Trust / engagement line */}
+      <section className="container mx-auto px-4 sm:px-6 py-6 max-w-full">
+        <p className="text-center text-sm text-[var(--c4)]">
+          One-time purchase. No subscription. Data anchored on Base · IPFS. Optional refill service when you need it.
+        </p>
+      </section>
+
+      {/* Pricing — single grid, continuous scroll (no View more) */}
+      <section id="pricing" className="container mx-auto px-4 sm:px-6 py-12 sm:py-20 max-w-full scroll-mt-20">
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-8 sm:mb-12">Pricing</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-6xl mx-auto">
-          {PRICING_TIERS.map((tier) => {
-            const isSelected = selectedCard === tier.id
-            const hasInteraction = tier.imgInteraction != null
-            return (
-              <div
-                key={tier.id}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && setSelectedCard(selectedCard === tier.id ? null : tier.id)}
-                onClick={() => setSelectedCard(selectedCard === tier.id ? null : tier.id)}
-                className={`
-                  pricing-card group text-left rounded-xl overflow-hidden transition-all duration-200 p-4 sm:p-4 cursor-pointer min-w-0
-                  border-2
-                  hover:border-[var(--c2)] hover:shadow-xl hover:shadow-[var(--c2)]/20
-                  ${isSelected
-                    ? 'border-[var(--c2)] shadow-xl shadow-[var(--c2)]/25 bg-[var(--c2)]/20'
-                    : 'border-[#1F2937] bg-[var(--bg-card)]'
-                  }
-                `}
-              >
-                <div className={`relative aspect-[4/3] overflow-hidden rounded-lg p-2 ${tier.imgBg} flex items-center justify-center`}>
-                  <img
-                    src={tier.img}
-                    alt={tier.alt}
-                    className={`pricing-img-default absolute inset-0 w-full h-full ${hasInteraction ? '' : ''}`}
-                  />
-                  {hasInteraction && (
-                    <img
-                      src={tier.imgInteraction!}
-                      alt={`${tier.alt} (interacción)`}
-                      className="pricing-img-interaction absolute inset-0 w-full h-full opacity-0"
-                      fetchPriority="high"
-                    />
-                  )}
-                </div>
-                <div className="pt-4">
-                  <h3 className="text-xl sm:text-2xl font-bold mb-2">{tier.title}</h3>
-                  <p className={`font-bold mb-4 ${tier.isContact ? 'text-base sm:text-lg text-[var(--c2)]' : `text-3xl sm:text-4xl ${tier.priceGradient ? 'gradient-text' : 'text-[var(--c2)]'}`}`}>
-                    {tier.price}
-                  </p>
-                  <ul className="text-sm text-[var(--c4)] space-y-2">
-                    {tier.features.map((f) => (
-                      <li key={f}>✓ {f}</li>
-                    ))}
-                  </ul>
-                  <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      className="flex-1 py-2 px-3 text-sm font-medium rounded-lg bg-[var(--c2)] text-white hover:opacity-90 transition-opacity"
-                    >
-                      Add to cart
-                    </button>
-                    <button
-                      type="button"
-                      className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      disabled={buyingTierId === tier.id}
-                      onClick={() => startCheckout(tier.id)}
-                    >
-                      {buyingTierId === tier.id ? 'Redirecting…' : 'Buy'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {PRODUCT_CATALOG.map((product) => (
+            <ProductCard
+              key={product.id}
+              id={product.id}
+              title={product.title}
+              nameCode={product.nameCode}
+              price={product.price}
+              material={product.material}
+              itemCount={product.itemCount}
+              features={product.features}
+              images={product.images}
+              imgBg={product.imgBg}
+              isContact={product.isContact}
+              stripeTierKey={product.stripeTierKey}
+              selected={selectedCard === product.id}
+              onSelect={() => setSelectedCard(selectedCard === product.id ? null : product.id)}
+              buyingTierId={buyingTierId}
+              onBuy={product.stripeTierKey ? startCheckout : undefined}
+            />
+          ))}
         </div>
       </section>
     </main>

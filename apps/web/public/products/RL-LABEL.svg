@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" fill="#f7f7f7" stroke="#1a1a1a" stroke-width="2" rx="8"/>
+  <!-- QR-style grid suggesting batch of labels -->
+  <g fill="#1a1a1a">
+    <rect x="30" y="30" width="20" height="20"/>
+    <rect x="55" y="30" width="20" height="20"/>
+    <rect x="80" y="30" width="20" height="20"/>
+    <rect x="105" y="30" width="20" height="20"/>
+    <rect x="130" y="30" width="20" height="20"/>
+    <rect x="155" y="30" width="20" height="20"/>
+    <rect x="30" y="55" width="20" height="20"/>
+    <rect x="80" y="55" width="20" height="20"/>
+    <rect x="130" y="55" width="20" height="20"/>
+    <rect x="155" y="55" width="20" height="20"/>
+    <rect x="30" y="80" width="20" height="20"/>
+    <rect x="55" y="80" width="20" height="20"/>
+    <rect x="105" y="80" width="20" height="20"/>
+    <rect x="155" y="80" width="20" height="20"/>
+    <rect x="30" y="105" width="20" height="20"/>
+    <rect x="80" y="105" width="20" height="20"/>
+    <rect x="130" y="105" width="20" height="20"/>
+    <rect x="30" y="130" width="20" height="20"/>
+    <rect x="55" y="130" width="20" height="20"/>
+    <rect x="105" y="130" width="20" height="20"/>
+    <rect x="155" y="130" width="20" height="20"/>
+    <rect x="30" y="155" width="20" height="20"/>
+    <rect x="80" y="155" width="20" height="20"/>
+    <rect x="130" y="155" width="20" height="20"/>
+    <rect x="155" y="155" width="20" height="20"/>
+  </g>
+  <!-- Accent -->
+  <rect x="55" y="55" width="50" height="50" fill="none" stroke="#FF6B35" stroke-width="3" rx="2"/>
+  <text x="100" y="118" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#FF6B35" text-anchor="middle">BATCH 100</text>
+</svg>
