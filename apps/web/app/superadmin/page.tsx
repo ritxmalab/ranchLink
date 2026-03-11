@@ -150,37 +150,48 @@ function stickerHTML(tag: any): string {
 }
 
 // Shared CSS for sticker layout — works centered on any paper size
-const STICKER_CSS = `
+// sizeMm: 30 = 30×30mm (default), 50 = 50×50mm complementary option
+function getStickerCSS(sizeMm: 30 | 50): string {
+  const is50 = sizeMm === 50
+  const sticker = is50 ? '50mm' : '30mm'
+  const img = is50 ? '37mm' : '22mm'
+  const tagCodePt = is50 ? 11 : 6.5
+  const batchPt = is50 ? 7.5 : 4.5
+  const specPt = is50 ? 6.5 : 4
+  const claimPt = is50 ? 6.5 : 4
+  const claimMax = is50 ? '46mm' : '28mm'
+  return `
   @page { margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: monospace; background: #fff; }
   .grid {
-    display: flex; flex-wrap: wrap; gap: 4mm;
+    display: flex; flex-wrap: wrap; gap: ${is50 ? '6mm' : '4mm'};
     justify-content: flex-start; align-items: flex-start;
   }
   .sticker {
-    width: 30mm; height: 30mm;
+    width: ${sticker}; height: ${sticker};
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     border: 0.3mm dashed #ccc;
     overflow: hidden; page-break-inside: avoid;
   }
-  .tag-code   { font-size: 6.5pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
-  .batch-name { font-size: 4.5pt; color: #333; margin-bottom: 0.3mm; letter-spacing: 0.2px; }
-  .spec-line  { font-size: 4pt; color: #888; margin-bottom: 0.5mm; }
-  img { width: 22mm; height: 22mm; display: block; }
-  .claim-code { font-size: 4pt; color: #000; font-weight: bold; margin-top: 0.4mm;
-                text-align: center; max-width: 28mm; overflow: hidden;
+  .tag-code   { font-size: ${tagCodePt}pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
+  .batch-name { font-size: ${batchPt}pt; color: #333; margin-bottom: 0.3mm; letter-spacing: 0.2px; }
+  .spec-line  { font-size: ${specPt}pt; color: #888; margin-bottom: 0.5mm; }
+  img { width: ${img}; height: ${img}; display: block; }
+  .claim-code { font-size: ${claimPt}pt; color: #000; font-weight: bold; margin-top: 0.4mm;
+                text-align: center; max-width: ${claimMax}; overflow: hidden;
                 white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.3px; }
 `
+}
 
 // ── Individual QR print ────────────────────────────────────────────────────────
-function printSingleQR(tag: any) {
+function printSingleQR(tag: any, sizeMm: 30 | 50 = 30) {
   const win = window.open('', '_blank', 'width=500,height=400')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>QR ${tag.tag_code}</title>
-<style>${STICKER_CSS}</style></head>
+<style>${getStickerCSS(sizeMm)}</style></head>
 <body><div class="grid">${stickerHTML(tag)}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0;
@@ -192,7 +203,7 @@ function printSingleQR(tag: any) {
 }
 
 // ── Batch QR print — all tags from the same batch in one print job ─────────────
-function printBatchQR(tags: any[]) {
+function printBatchQR(tags: any[], sizeMm: 30 | 50 = 30) {
   if (!tags.length) return
   const batchName = tags[0].batch_name || 'Batch'
   const win = window.open('', '_blank', 'width=800,height=600')
@@ -200,11 +211,11 @@ function printBatchQR(tags: any[]) {
   const stickers = tags.map(stickerHTML).join('')
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Batch ${batchName} — ${tags.length} tags</title>
-<style>${STICKER_CSS}
+<style>${getStickerCSS(sizeMm)}
   h1 { font-size: 9pt; color: #555; margin-bottom: 4mm; font-family: monospace; }
 </style></head>
 <body>
-<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags</h1>
+<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${sizeMm}×${sizeMm}mm</h1>
 <div class="grid">${stickers}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0, total = imgs.length;
@@ -246,7 +257,7 @@ const STATUS_LABELS: Record<string, string> = {
 // ── Assemble Tab ──────────────────────────────────────────────────────────────
 // Workflow: 🖨️ Print QR → 🔧 Assemble → 🖨️ Confirm Print → 📥 Push to Inventory
 // Shipping is NOT part of this flow — it appears in Inventory after purchase/gift.
-function AssembleTab() {
+function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
   const [tags, setTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -280,7 +291,7 @@ function AssembleTab() {
   }
 
   const handlePrint = (tagId: string, tag: any, phase: 'pre' | 'post') => {
-    printSingleQR(tag)
+    printSingleQR(tag, stickerSizeMm)
     // Only mark as printed after user confirms they actually sent the print job
     setTimeout(() => {
       const confirmed = window.confirm('Did the QR label print successfully?')
@@ -348,7 +359,7 @@ function AssembleTab() {
                 {batchEntries.map(([name, bTags]) => (
                   <button
                     key={name}
-                    onClick={() => printBatchQR(bTags)}
+                    onClick={() => printBatchQR(bTags, stickerSizeMm)}
                     className="flex items-center gap-2 px-4 py-2 bg-[var(--c2)] hover:opacity-80 text-white rounded-lg text-sm font-semibold shadow"
                   >
                     🖨️ Print Batch "{name}" ({bTags.length} tags)
@@ -384,13 +395,13 @@ function AssembleTab() {
                 <div key={tag.id} className="border border-white/10 rounded-xl p-4 bg-[var(--bg-card)]">
                   <div className="flex items-start gap-4">
 
-                    {/* QR preview — 30mm sticker preview */}
+                    {/* QR preview — sticker size matches print layout */}
                     <div className="flex-shrink-0 flex flex-col items-center gap-1">
                       <div className="bg-white p-1.5 rounded border-2 border-[var(--c2)]">
                         <QRCodeDisplay url={qrUrl} size={72} />
                       </div>
                       <div className="text-[9px] text-[var(--c4)] font-mono text-center leading-tight max-w-[80px] break-all">
-                        30mm × 30mm
+                        {stickerSizeMm}mm × {stickerSizeMm}mm
                       </div>
                     </div>
 
@@ -507,6 +518,7 @@ export default function SuperAdminPage() {
   const [itwGrams, setItwGrams] = useState<number>(11) // Individual Tag Weight in grams
   const [batchName, setBatchName] = useState('')
   const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().slice(0, 10))
+  const [stickerSizeMm, setStickerSizeMm] = useState<30 | 50>(30)
 
   // Latest batch state
   const [latestBatch, setLatestBatch] = useState<{
@@ -885,6 +897,32 @@ export default function SuperAdminPage() {
                     onChange={e=>setBatchDate(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">QR sticker size (print)</label>
+                  <div className="flex gap-3 items-center">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="stickerSize"
+                        checked={stickerSizeMm === 30}
+                        onChange={() => setStickerSizeMm(30)}
+                        className="text-[var(--c2)]"
+                      />
+                      <span>30×30 mm</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="stickerSize"
+                        checked={stickerSizeMm === 50}
+                        onChange={() => setStickerSizeMm(50)}
+                        className="text-[var(--c2)]"
+                      />
+                      <span>50×50 mm</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-[var(--c4)] mt-1">Used for all Print QR actions (Assemble & Inventory)</p>
+                </div>
                 <div className="flex items-end">
                   <button
                     onClick={handleGenerate}
@@ -1087,7 +1125,7 @@ export default function SuperAdminPage() {
                                 {/* QR Code - Points to /t/[tag_code] */}
                                 <div className="mb-4">
                                   <div className="text-xs font-semibold mb-2 text-center bg-gradient-to-r from-[var(--c2)] to-[var(--c3)] text-white px-2 py-1 rounded">
-                                    QR Code (30mm × 30mm)
+                                    QR Code ({stickerSizeMm}×{stickerSizeMm}mm)
                                   </div>
                                   <div className="bg-white p-2 rounded border-4 border-[var(--c2)] flex justify-center print:border-2 print:border-black">
                                     <QRCodeDisplay url={device.base_qr_url} size={150} />
@@ -1190,7 +1228,7 @@ export default function SuperAdminPage() {
         )}
 
         {/* Assemble Tab */}
-        {activeTab === 'assemble' && <AssembleTab />}
+        {activeTab === 'assemble' && <AssembleTab stickerSizeMm={stickerSizeMm} />}
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
@@ -1372,9 +1410,9 @@ export default function SuperAdminPage() {
                             <div className="flex items-center gap-1 flex-wrap">
                               {/* Print QR — always available */}
                               <button
-                                onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` })}
+                                onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` }, stickerSizeMm)}
                                 className="px-2 py-1 bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] hover:text-white rounded text-xs"
-                                title="Print 30mm QR sticker"
+                                title={`Print ${stickerSizeMm}×${stickerSizeMm}mm QR sticker`}
                               >
                                 🖨️
                               </button>
@@ -1468,7 +1506,7 @@ export default function SuperAdminPage() {
                           </div>
                           <div className="text-[10px] text-[var(--c4)] mt-1 text-center break-all">{device.base_qr_url}</div>
                           <button
-                            onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` })}
+                            onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` }, stickerSizeMm)}
                             className="mt-2 w-full px-2 py-1.5 bg-[var(--c2)] hover:opacity-80 text-white rounded text-xs font-semibold"
                           >
                             🖨️ Print this QR
