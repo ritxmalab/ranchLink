@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
+import { getSupabaseServerClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,15 +42,46 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
+      customer_email: typeof body?.email === 'string' ? body.email : undefined,
       line_items: [
         {
           price: PRICE_MAP[tier]!,
           quantity: 1,
         },
       ],
-      success_url: `${baseUrl}/?checkout=success`,
+      metadata: {
+        tier,
+      },
+      success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/?checkout=cancelled`,
     })
+
+    // Best-effort persistence of the created session. Webhook will finalize status.
+    try {
+      const supabase = getSupabaseServerClient()
+      const paymentIntentId =
+        typeof session.payment_intent === 'string'
+          ? session.payment_intent
+          : session.payment_intent?.id
+
+      await supabase.from('stripe_orders').upsert(
+        {
+          stripe_checkout_session_id: session.id,
+          stripe_payment_intent_id: paymentIntentId ?? null,
+          customer_email: session.customer_details?.email ?? null,
+          customer_name: session.customer_details?.name ?? null,
+          tier,
+          amount_total: session.amount_total ?? null,
+          currency: session.currency ?? null,
+          payment_status: session.payment_status ?? 'unpaid',
+          status: 'created',
+          metadata: session.metadata ?? {},
+        },
+        { onConflict: 'stripe_checkout_session_id' }
+      )
+    } catch (persistError) {
+      console.warn('Stripe checkout session persistence warning', persistError)
+    }
 
     return NextResponse.json({ url: session.url })
   } catch (error: any) {
