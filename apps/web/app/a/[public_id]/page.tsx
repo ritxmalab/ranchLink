@@ -100,10 +100,16 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
     fetchAnimal()
     // Check owner cookie client-side (set at attach time)
     setIsOwner(!!getOwnerCookie(public_id))
-    // Check if opened from superadmin (?superadmin=1) — grants edit access
+    // Check if opened from superadmin (?superadmin=1) and validate via server session.
     const params = new URLSearchParams(window.location.search)
-    const hasSuperadminCookie = document.cookie.split(';').some(c => c.trim().startsWith('rl_superadmin=') && c.trim().split('=')[1]?.trim().length > 0)
-    setIsSuperadminView(params.get('superadmin') === '1' && hasSuperadminCookie)
+    if (params.get('superadmin') === '1') {
+      fetch('/api/superadmin/session', { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => setIsSuperadminView(Boolean(data?.authenticated)))
+        .catch(() => setIsSuperadminView(false))
+    } else {
+      setIsSuperadminView(false)
+    }
   }, [public_id])
 
   const fetchAnimal = async () => {

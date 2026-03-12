@@ -3,7 +3,7 @@
  */
 
 export const SUPERADMIN_COOKIE = 'rl_superadmin'
-export const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || 'ranchlink2026'
+export const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || '[REDACTED]'
 
 export function checkSuperadminCookie(cookieValue: string | undefined): boolean {
   if (!cookieValue) return false

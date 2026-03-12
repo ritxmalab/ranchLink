@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
 import { getDefaultCattleContract } from '@/lib/blockchain/contractRegistry'
 import { rateLimit } from '@/lib/rate-limit'
+import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -31,12 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Superadmin-only — this endpoint triggers on-chain mints from the server wallet
-  const cookieHeader = request.headers.get('cookie') || ''
-  const isSuperadmin = cookieHeader.split(';').some(c => {
-    const t = c.trim()
-    return t.startsWith('rl_superadmin=') && t.split('=')[1]?.trim().length > 0
-  })
-  if (!isSuperadmin) {
+  if (!isSuperadminAuthenticated(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   

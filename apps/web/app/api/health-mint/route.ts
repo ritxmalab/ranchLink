@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,7 +8,10 @@ export const dynamic = 'force-dynamic'
  * Simple health check that also verifies minting environment
  * This will show up in Vercel logs immediately
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   console.error('[HEALTH-MINT] ========================================')
   console.error('[HEALTH-MINT] Health check called')
   console.error('[HEALTH-MINT] ========================================')

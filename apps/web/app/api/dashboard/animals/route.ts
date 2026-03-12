@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,9 @@ export const dynamic = 'force-dynamic'
  * so no animal is ever missing due to relation or timing.
  */
 export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     const supabase = getSupabaseServerClient()
 

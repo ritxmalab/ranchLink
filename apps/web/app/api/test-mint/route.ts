@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 /**
  * POST /api/test-mint
@@ -7,6 +8,9 @@ import { mintTag as mintTagUnified } from '@/lib/blockchain/mintTag'
  * This will help us diagnose why minting isn't working
  */
 export async function POST(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     console.log('[TEST-MINT] Starting mint test...')
     

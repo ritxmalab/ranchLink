@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { createPublicClient, http } from 'viem'
 import { base } from '@/lib/blockchain/config'
 import { rateLimit } from '@/lib/rate-limit'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,9 @@ const syncTagSchema = z.object({
  * This fixes cases where the transaction completed but the DB wasn't updated
  */
 export async function POST(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   // Rate limiting - prevent DoS attacks (CVE-2025-55184)
   if (!rateLimit(request, 10, 60000)) {
     return NextResponse.json(

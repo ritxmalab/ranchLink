@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 import { z } from 'zod'
 
 export const maxDuration = 60 // setCID on-chain call can take 10-30s
@@ -86,12 +87,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Animal not found' }, { status: 404 })
     }
 
-    // Ownership check — superadmin cookie bypasses this
-    const cookieHeader = request.headers.get('cookie') || ''
-    const isSuperadmin = cookieHeader.split(';').some(c => {
-      const t = c.trim()
-      return t.startsWith('rl_superadmin=') && t.split('=')[1]?.trim().length > 0
-    })
+    // Ownership check — authenticated superadmin session bypasses claim-token check.
+    const isSuperadmin = isSuperadminAuthenticated(request)
     if (!isSuperadmin) {
       // Fetch claim_token from tags table separately (column may not exist yet)
       const tag = Array.isArray(animal.tags) ? animal.tags[0] : animal.tags as any

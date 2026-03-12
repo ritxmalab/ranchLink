@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 // Lightweight debug endpoint to inspect a tag and its linked animal.
 // GET /api/debug/tag/[tag_code]
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { tag_code: string } }
 ) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     const supabase = getSupabaseServerClient()
     const tagCode = params.tag_code

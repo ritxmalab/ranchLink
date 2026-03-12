@@ -7,6 +7,7 @@ import { getBuildBadgeText } from '@/lib/build-info'
 
 // ── Password Gate ──────────────────────────────────────────────────────────────
 function SuperadminLogin({ onAuth }: { onAuth: () => void }) {
+  const [username, setUsername] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,12 +19,12 @@ function SuperadminLogin({ onAuth }: { onAuth: () => void }) {
     const res = await fetch('/api/superadmin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
+      body: JSON.stringify({ username, password: pw }),
     })
     if (res.ok) {
       onAuth()
     } else {
-      setErr('Invalid password')
+      setErr('Invalid credentials')
     }
     setLoading(false)
   }
@@ -32,15 +33,24 @@ function SuperadminLogin({ onAuth }: { onAuth: () => void }) {
     <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center px-4">
       <div className="card w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-1 text-center">🔒 RanchLink Admin</h1>
-        <p className="text-[var(--c4)] text-sm text-center mb-6">Enter your admin password to continue</p>
+        <p className="text-[var(--c4)] text-sm text-center mb-6">Enter your admin credentials to continue</p>
         <form onSubmit={submit} className="space-y-4">
+          <input
+            type="email"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="Admin email"
+            className="w-full px-4 py-3 bg-[var(--bg-card)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none"
+            autoFocus
+            required
+          />
           <input
             type="password"
             value={pw}
             onChange={e => setPw(e.target.value)}
             placeholder="Password"
             className="w-full px-4 py-3 bg-[var(--bg-card)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none"
-            autoFocus
+            required
           />
           {err && <p className="text-red-400 text-sm">{err}</p>}
           <button type="submit" className="btn-primary w-full" disabled={loading}>
@@ -694,15 +704,21 @@ export default function SuperAdminPage() {
     }
   }, [])
 
-  // Check cookie auth on mount — use exact key match (cookie is not httpOnly)
+  // Check superadmin auth on mount via server-side session verification.
   useEffect(() => {
-    const hasCookie = document.cookie
-      .split(';')
-      .some(c => c.trim().startsWith('rl_superadmin=') && c.trim().split('=')[1]?.trim().length > 0)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'auth-audit-pre',hypothesisId:'H4',location:'app/superadmin/page.tsx:authEffect',message:'Client superadmin cookie gate evaluated',data:{cookieStringLength:document.cookie.length,hasSuperadminCookie:hasCookie},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-    setAuthed(hasCookie)
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/superadmin/session', { credentials: 'include' })
+        const data = await response.json().catch(() => ({ authenticated: false }))
+        if (!cancelled) setAuthed(Boolean(data?.authenticated))
+      } catch {
+        if (!cancelled) setAuthed(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Fetch devices only after authenticated

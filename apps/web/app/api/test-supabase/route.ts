@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 /**
  * Test endpoint to verify Supabase connection
  * GET /api/test-supabase
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     const supabase = getSupabaseServerClient()
     // Test connection by querying a simple table

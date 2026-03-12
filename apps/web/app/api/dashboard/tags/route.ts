@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { verifySuperadminAuth } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +12,9 @@ export const dynamic = 'force-dynamic'
  * For now, returns all tags (will be filtered by ranch_id in production)
  */
 export async function GET(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     const supabase = getSupabaseServerClient()
 
