@@ -23,3 +23,14 @@ export function verifySuperadminAuth(request: NextRequest): NextResponse | null 
   }
   return null
 }
+
+/**
+ * Verify TAMACORE access: superadmin cookie OR internal key (for scripted agent).
+ * Use on routes that the agent may call from a script (e.g. batch comptroller).
+ */
+export function verifyTamacoreAuth(request: NextRequest): NextResponse | null {
+  const key = request.headers.get('x-tamacore-key') ?? request.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const internalKey = process.env.TAMACORE_INTERNAL_KEY
+  if (internalKey && key === internalKey) return null
+  return verifySuperadminAuth(request)
+}
