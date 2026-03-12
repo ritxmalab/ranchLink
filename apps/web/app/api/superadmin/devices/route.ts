@@ -86,6 +86,22 @@ export async function GET(request: NextRequest) {
         }, {})
       }
     }
+
+    // Read optional assembly photo metadata from devices table (legacy compatibility store)
+    const tagCodes = [...new Set((tagsData || []).map((t: any) => t.tag_code).filter(Boolean))]
+    let assemblyPhotoMap: Record<string, string> = {}
+    if (tagCodes.length > 0) {
+      const { data: deviceMetaRows } = await supabase
+        .from('devices')
+        .select('tag_id,metadata')
+        .in('tag_id', tagCodes)
+      if (deviceMetaRows) {
+        for (const row of deviceMetaRows as any[]) {
+          const photo = row?.metadata?.assembly_photo_url
+          if (row?.tag_id && photo) assemblyPhotoMap[row.tag_id] = photo
+        }
+      }
+    }
     
     // Map tags to Device format for backward compatibility
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
@@ -113,6 +129,7 @@ export async function GET(request: NextRequest) {
         color: batch?.color || null,
         batch_name: batch?.name || null,
         batch_date: batch?.created_at ? new Date(batch.created_at).toISOString().slice(0, 10) : null,
+        assembly_photo_url: assemblyPhotoMap[tag.tag_code] || null,
         metadata: {
           material: batch?.material || null,
           model: batch?.model || null,
@@ -121,6 +138,7 @@ export async function GET(request: NextRequest) {
           batch_name: batch?.name || null,
           batch_date: batch?.created_at ? new Date(batch.created_at).toISOString().slice(0, 10) : null,
           code: tag.tag_code,
+          assembly_photo_url: assemblyPhotoMap[tag.tag_code] || null,
         },
       }
     })

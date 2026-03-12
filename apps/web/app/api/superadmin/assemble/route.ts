@@ -43,6 +43,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
 
+  // Enforce physical verification: cannot push to inventory without assembled photo.
+  if (validated.action === 'push_to_inventory') {
+    const tagLookup = await fetch(
+      `${supabaseUrl}/rest/v1/tags?id=eq.${validated.tag_id}&select=tag_code&limit=1`,
+      {
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Cache-Control': 'no-cache, no-store',
+        },
+        cache: 'no-store',
+      }
+    )
+    if (!tagLookup.ok) {
+      return NextResponse.json({ error: 'Failed to verify tag before inventory push' }, { status: 500 })
+    }
+    const tagRows = await tagLookup.json()
+    const tagCode = tagRows?.[0]?.tag_code
+    if (!tagCode) {
+      return NextResponse.json({ error: 'Tag not found' }, { status: 404 })
+    }
+
+    const photoLookup = await fetch(
+      `${supabaseUrl}/rest/v1/devices?tag_id=eq.${encodeURIComponent(tagCode)}&select=metadata&limit=1`,
+      {
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Cache-Control': 'no-cache, no-store',
+        },
+        cache: 'no-store',
+      }
+    )
+    if (!photoLookup.ok) {
+      return NextResponse.json({ error: 'Failed to verify assembly photo' }, { status: 500 })
+    }
+    const photoRows = await photoLookup.json()
+    const assemblyPhotoUrl = photoRows?.[0]?.metadata?.assembly_photo_url
+    if (!assemblyPhotoUrl) {
+      return NextResponse.json(
+        { error: 'Assembly photo required before pushing to inventory' },
+        { status: 400 }
+      )
+    }
+  }
+
   const now = new Date().toISOString()
   const update: Record<string, any> = {}
 
@@ -140,6 +186,32 @@ export async function GET(request: NextRequest) {
 
   const tags = await res.json()
 
+  // Merge assembly photo URL from legacy devices metadata (no tags schema migration required).
+  let assemblyPhotoMap: Record<string, string> = {}
+  try {
+    const devicesRes = await fetch(
+      `${supabaseUrl}/rest/v1/devices?select=tag_id,metadata`,
+      {
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Cache-Control': 'no-cache, no-store',
+        },
+        cache: 'no-store',
+      }
+    )
+    if (devicesRes.ok) {
+      const devices = await devicesRes.json()
+      for (const row of devices || []) {
+        const tagId = row?.tag_id
+        const photo = row?.metadata?.assembly_photo_url
+        if (tagId && photo) assemblyPhotoMap[tagId] = photo
+      }
+    }
+  } catch (error) {
+    console.warn('[ASSEMBLE] Failed to merge assembly photo metadata', error)
+  }
+
   const enriched = (tags || []).map((t: any) => {
     const batch = t.batches ?? null
     const { batches: _, ...rest } = t
@@ -149,6 +221,7 @@ export async function GET(request: NextRequest) {
       material: batch?.material ?? null,
       color: batch?.color ?? null,
       base_qr_url: `${appUrl}/t/${t.tag_code}`,
+      assembly_photo_url: assemblyPhotoMap[t.tag_code] || null,
     }
   })
 

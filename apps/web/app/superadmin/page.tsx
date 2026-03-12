@@ -80,6 +80,7 @@ interface Device {
   color?: string
   batch_name?: string
   batch_date?: string
+  assembly_photo_url?: string | null
   code?: string
   material?: string
   metadata?: Record<string, any>
@@ -110,6 +111,7 @@ const mapDevice = (device: any): Device => {
     color: metadata.color ?? device.color,
     batch_name: metadata.batch_name ?? device.batch_name,
     batch_date: metadata.batch_date ?? device.batch_date,
+    assembly_photo_url: device.assembly_photo_url ?? metadata.assembly_photo_url ?? null,
     code: device.code ?? device.serial ?? device.tag_code ?? metadata.code,
     metadata,
   }
@@ -261,6 +263,7 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
   const [tags, setTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [photoUploadingTagId, setPhotoUploadingTagId] = useState<string | null>(null)
   // Two-phase print tracking: 'pre' = printed before assembly, 'post' = printed after assembly
   const [printState, setPrintState] = useState<Record<string, 'pre' | 'post' | undefined>>({})
 
@@ -299,6 +302,30 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
         setPrintState(prev => ({ ...prev, [tagId]: phase }))
       }
     }, 800)
+  }
+
+  const handlePhotoUpload = async (tag: any, file: File | null) => {
+    if (!file) return
+    setPhotoUploadingTagId(tag.id)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('tag_code', tag.tag_code)
+      const res = await fetch('/api/superadmin/tag-photo', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Photo upload failed')
+      }
+      setTags(prev => prev.map(t => t.id === tag.id ? { ...t, assembly_photo_url: data.photo_url } : t))
+    } catch (error: any) {
+      alert(`Photo upload failed: ${error.message || 'Unknown error'}`)
+    } finally {
+      setPhotoUploadingTagId(null)
+    }
   }
 
 
@@ -379,7 +406,9 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
             {' → '}
             <span className="text-orange-400">③ Confirm Print</span>
             {' → '}
-            <span className="text-indigo-400">④ Push to Inventory</span>
+            <span className="text-teal-400">④ Upload Photo</span>
+            {' → '}
+            <span className="text-indigo-400">⑤ Push to Inventory</span>
           </div>
 
           <div className="space-y-4">
@@ -389,6 +418,7 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
               const hasPrintedPre = tagPrintState === 'pre' || tagPrintState === 'post'
               const hasPrintedPost = tagPrintState === 'post'
               const isAssembled = tag.status === 'assembled'
+              const hasAssemblyPhoto = Boolean(tag.assembly_photo_url)
               const qrUrl = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
 
               return (
@@ -421,6 +451,17 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
                       {(tag.color || tag.material) && (
                         <div className="text-xs text-[var(--c4)] mb-1">
                           {[tag.color, tag.material].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
+                      {hasAssemblyPhoto && (
+                        <div className="mt-2">
+                          <a href={tag.assembly_photo_url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={tag.assembly_photo_url}
+                              alt={`Assembly photo ${tag.tag_code}`}
+                              className="w-16 h-16 object-cover rounded border border-green-600/60"
+                            />
+                          </a>
                         </div>
                       )}
                       {tag.assembled_at && (
@@ -473,12 +514,34 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
                         </button>
                       )}
 
+                      {/* Step 3.5: Upload assembled physical photo (required before inventory push) */}
+                      {isAssembled && (
+                        <label
+                          className={`w-full px-3 py-2 rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            hasAssemblyPhoto
+                              ? 'bg-green-900/30 border border-green-600 text-green-400'
+                              : 'bg-teal-700 hover:bg-teal-600 text-white shadow-md'
+                          }`}
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => handlePhotoUpload(tag, e.target.files?.[0] || null)}
+                          />
+                          {photoUploadingTagId === tag.id
+                            ? '⏳ Uploading...'
+                            : (hasAssemblyPhoto ? '✅ Photo Saved' : '📸 Upload Tag Photo')}
+                        </label>
+                      )}
+
                       {/* Step 4: Push to Inventory — only after assembled + printed */}
                       {isAssembled && (
                         <button
                           onClick={() => handleAction(tag.id, 'push_to_inventory')}
-                          disabled={!hasPrintedPost || actionLoading === tag.id + 'push_to_inventory'}
-                          title={!hasPrintedPost ? 'Print the final label first' : 'Move to inventory'}
+                          disabled={!hasPrintedPost || !hasAssemblyPhoto || actionLoading === tag.id + 'push_to_inventory'}
+                          title={!hasPrintedPost ? 'Print the final label first' : (!hasAssemblyPhoto ? 'Upload assembled tag photo first' : 'Move to inventory')}
                           className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                         >
                           {actionLoading === tag.id + 'push_to_inventory' ? '⏳ ...' : '📥 Push to Inventory'}
@@ -516,6 +579,7 @@ export default function SuperAdminPage() {
   const [color, setColor] = useState('Yellow')
   const [filamentBrand, setFilamentBrand] = useState('Bambu Lab')
   const [itwGrams, setItwGrams] = useState<number>(11) // Individual Tag Weight in grams
+  const [itwInput, setItwInput] = useState<string>('11')
   const [batchName, setBatchName] = useState('')
   const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [stickerSizeMm, setStickerSizeMm] = useState<30 | 50>(30)
@@ -866,12 +930,33 @@ export default function SuperAdminPage() {
                     ITW — Individual Tag Weight (g)
                   </label>
                   <input
-                    type="number"
-                    min="1"
-                    step="0.1"
+                    type="text"
+                    inputMode="decimal"
                     className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-[var(--c2)] focus:outline-none bg-white text-gray-900"
-                    value={itwGrams}
-                    onChange={e => setItwGrams(parseFloat(e.target.value) || 0)}
+                    value={itwInput}
+                    onChange={e => {
+                      const raw = e.target.value
+                      setItwInput(raw)
+                      const normalized = raw.replace(',', '.').trim()
+                      if (!normalized) return
+                      const valid = /^(\d+(\.\d*)?|\.\d+)$/.test(normalized)
+                      if (!valid) return
+                      const parsed = Number(normalized)
+                      if (Number.isFinite(parsed) && parsed > 0) {
+                        setItwGrams(parsed)
+                      }
+                    }}
+                    onBlur={() => {
+                      const normalized = itwInput.replace(',', '.').trim()
+                      const parsed = Number(normalized)
+                      if (Number.isFinite(parsed) && parsed > 0) {
+                        const rounded = Math.round(parsed * 100) / 100
+                        setItwGrams(rounded)
+                        setItwInput(String(rounded))
+                      } else {
+                        setItwInput(String(itwGrams))
+                      }
+                    }}
                     placeholder="11"
                   />
                   <p className="text-xs text-[var(--c4)] mt-1">
@@ -1291,6 +1376,7 @@ export default function SuperAdminPage() {
                       <th className="text-left py-2 px-3">Status</th>
                       <th className="text-left py-2 px-3">On-Chain</th>
                       <th className="text-left py-2 px-3">Animal</th>
+                      <th className="text-left py-2 px-3">Tag Photo</th>
                       <th className="text-left py-2 px-3">Actions</th>
                     </tr>
                   </thead>
@@ -1401,6 +1487,19 @@ export default function SuperAdminPage() {
                             {device.public_id ? (
                               <a href={`/a/${device.public_id}`} className="text-[var(--c2)] hover:underline text-xs">
                                 {device.public_id}
+                              </a>
+                            ) : (
+                              <span className="text-gray-500 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            {device.assembly_photo_url ? (
+                              <a href={device.assembly_photo_url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={device.assembly_photo_url}
+                                  alt={`Tag photo ${device.tag_code || device.tag_id}`}
+                                  className="w-10 h-10 object-cover rounded border border-green-600/60"
+                                />
                               </a>
                             ) : (
                               <span className="text-gray-500 text-xs">—</span>
