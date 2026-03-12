@@ -496,169 +496,9 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
   )
 }
 
-// ── Pipeline (TAMACORE) Tab ─────────────────────────────────────────────────────
-const CRED = { credentials: 'include' as RequestCredentials }
-const POLL_MS = 4000
-type PipelineContact = {
-  id: string
-  list_order: number
-  legal_name: string
-  contact: string | null
-  location: string | null
-  category: string | null
-  herd_type: string | null
-  estimated_herd: string | null
-  status: string
-  created_at: string
-  updated_at: string
-}
-type PipelineActivity = {
-  id: string
-  pipeline_contact_id: string | null
-  action_type: string
-  step: string | null
-  payload: Record<string, unknown> | null
-  created_at: string
-}
-function PipelineTab() {
-  const [contacts, setContacts] = useState<PipelineContact[]>([])
-  const [activities, setActivities] = useState<PipelineActivity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [seedLoading, setSeedLoading] = useState(false)
-  const [seedMessage, setSeedMessage] = useState<string | null>(null)
-  const fetchPipeline = useCallback(async () => {
-    try {
-      const res = await fetch('/api/tamacore/pipeline', CRED)
-      const data = await res.json()
-      if (data.contacts) setContacts(data.contacts)
-    } catch (e) { console.error('Pipeline fetch error:', e) }
-  }, [])
-  const fetchActivity = useCallback(async () => {
-    try {
-      const res = await fetch('/api/tamacore/activity?limit=30', CRED)
-      const data = await res.json()
-      if (data.activities) setActivities(data.activities)
-    } catch (e) { console.error('Activity fetch error:', e) }
-  }, [])
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([fetchPipeline(), fetchActivity()]).finally(() => setLoading(false))
-  }, [fetchPipeline, fetchActivity])
-  useEffect(() => {
-    load()
-    const t = setInterval(load, POLL_MS)
-    return () => clearInterval(t)
-  }, [load])
-  const runSeed = async () => {
-    setSeedLoading(true)
-    setSeedMessage(null)
-    try {
-      const res = await fetch('/api/tamacore/seed', { method: 'POST', ...CRED })
-      const data = await res.json()
-      if (res.ok) { setSeedMessage(data.message || 'Seeded.'); fetchPipeline() }
-      else setSeedMessage(data.error || data.hint || 'Seed failed')
-    } catch (e: unknown) { setSeedMessage(String(e)) }
-    setSeedLoading(false)
-  }
-  const byCategory = contacts.reduce<Record<string, { total: number; contacted: number }>>((acc, c) => {
-    const cat = c.category || 'Other'
-    if (!acc[cat]) acc[cat] = { total: 0, contacted: 0 }
-    acc[cat].total++
-    if (['prototype_sent', 'demo_sent', 'contacted', 'converted'].includes(c.status)) acc[cat].contacted++
-    return acc
-  }, {})
-  return (
-    <div className="space-y-6">
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-[var(--c2)]">TAMACORE — Pipeline</h2>
-            <p className="text-[var(--c4)] text-sm mt-1">Early target pipeline & agent activity (demo mailing)</p>
-          </div>
-          <button onClick={load} className="btn-secondary">🔄 Refresh</button>
-        </div>
-        {contacts.length === 0 && !loading && (
-          <div className="mb-6 p-4 bg-[var(--bg-card)] border border-[#1F2937] rounded-lg">
-            <p className="text-[var(--c4)] mb-3">Pipeline is empty. Run ADD_TAMACORE_PIPELINE.sql in Supabase, then seed.</p>
-            <button type="button" onClick={runSeed} disabled={seedLoading} className="px-4 py-2 rounded-lg bg-[var(--c2)] text-white font-medium disabled:opacity-60">
-              {seedLoading ? 'Seeding...' : 'Seed pipeline'}
-            </button>
-            {seedMessage && <p className="mt-2 text-sm text-[var(--c4)]">{seedMessage}</p>}
-          </div>
-        )}
-        {Object.keys(byCategory).length > 0 && (
-          <section className="mb-8">
-            <h3 className="text-lg font-bold mb-3 text-[var(--c2)]">Outreach summary</h3>
-            <table className="w-full text-sm border border-[#1F2937] rounded-lg overflow-hidden">
-              <thead><tr className="bg-[var(--bg-card)] text-left">
-                <th className="p-3 border-b border-[#1F2937]">Segment</th>
-                <th className="p-3 border-b border-[#1F2937]">Targets</th>
-                <th className="p-3 border-b border-[#1F2937]">Contacted</th>
-                <th className="p-3 border-b border-[#1F2937]">Remaining</th>
-              </tr></thead>
-              <tbody>
-                {Object.entries(byCategory).map(([segment, v]) => (
-                  <tr key={segment} className="border-b border-[#1F2937] last:border-0">
-                    <td className="p-3">{segment}</td><td className="p-3">{v.total}</td><td className="p-3">{v.contacted}</td><td className="p-3">{v.total - v.contacted}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        )}
-        <section className="mb-8">
-          <h3 className="text-lg font-bold mb-3 text-[var(--c2)]">Pipeline contacts</h3>
-          {loading && contacts.length === 0 ? <p className="text-[var(--c4)]">Loading...</p> : (
-            <div className="overflow-x-auto border border-[#1F2937] rounded-lg">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-[var(--bg-card)] text-left">
-                  <th className="p-2 sm:p-3 border-b border-[#1F2937]">#</th>
-                  <th className="p-2 sm:p-3 border-b border-[#1F2937]">Legal name</th>
-                  <th className="p-2 sm:p-3 border-b border-[#1F2937]">Contact</th>
-                  <th className="p-2 sm:p-3 border-b border-[#1F2937]">Category</th>
-                  <th className="p-2 sm:p-3 border-b border-[#1F2937]">Status</th>
-                </tr></thead>
-                <tbody>
-                  {contacts.map((c) => (
-                    <tr key={c.id} className="border-b border-[#1F2937] last:border-0 hover:bg-[var(--bg-card)]/50">
-                      <td className="p-2 sm:p-3">{c.list_order}</td>
-                      <td className="p-2 sm:p-3 font-medium">{c.legal_name}</td>
-                      <td className="p-2 sm:p-3 text-[var(--c4)]">{c.contact ?? '—'}</td>
-                      <td className="p-2 sm:p-3">{c.category ?? '—'}</td>
-                      <td className="p-2 sm:p-3">
-                        <span className={c.status === 'prototype_sent' || c.status === 'demo_sent' || c.status === 'converted' ? 'text-green-400' : c.status === 'target' ? 'text-[var(--c2)]' : 'text-[var(--c4)]'}>{c.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-        <section>
-          <h3 className="text-lg font-bold mb-3 text-[var(--c2)]">Agent activity (live)</h3>
-          <p className="text-xs text-[var(--c4)] mb-2">Refreshes every {POLL_MS / 1000}s</p>
-          {activities.length === 0 && !loading ? <p className="text-[var(--c4)]">No activity yet.</p> : (
-            <ul className="space-y-2 max-h-[320px] overflow-y-auto">
-              {activities.map((a) => (
-                <li key={a.id} className="p-3 rounded-lg bg-[var(--bg-card)] border border-[#1F2937] text-sm flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <span className="text-[var(--c4)] font-mono text-xs">{new Date(a.created_at).toLocaleString()}</span>
-                  <span className="font-medium text-[var(--c2)]">{a.action_type}</span>
-                  {a.step && <span className="text-[var(--c4)]">{a.step}</span>}
-                  {a.payload && Object.keys(a.payload).length > 0 && <pre className="w-full mt-1 text-xs text-[var(--c4)] overflow-x-auto">{JSON.stringify(a.payload)}</pre>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </div>
-  )
-}
-
 export default function SuperAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null)
-  const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory' | 'pipeline'>('factory')
+  const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory'>('factory')
 
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedBatch, setSelectedBatch] = useState<string>('')
@@ -872,7 +712,6 @@ export default function SuperAdminPage() {
     { id: 'assemble', label: '📦 Assemble' },
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'inventory', label: '🗂️ Inventory' },
-    { id: 'pipeline', label: '📋 Pipeline' },
   ]
 
   return (
@@ -1682,9 +1521,6 @@ export default function SuperAdminPage() {
             )}
           </div>
         )}
-
-        {/* Pipeline (TAMACORE) Tab */}
-        {activeTab === 'pipeline' && <PipelineTab />}
       </div>
     </div>
   )

@@ -7,15 +7,12 @@ export default function NotFound() {
         <p className="text-[var(--c4)] mb-8">
           The page you're looking for doesn't exist or has been moved.
         </p>
-        <div className="flex gap-4 justify-center flex-wrap">
+        <div className="flex gap-4 justify-center">
           <a href="/" className="btn-primary">
             Go Home
           </a>
           <a href="/superadmin" className="btn-secondary">
             Super Admin
-          </a>
-          <a href="/tamacore" className="btn-secondary">
-            TAMACORE
           </a>
         </div>
       </div>
