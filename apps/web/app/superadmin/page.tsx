@@ -129,18 +129,59 @@ function formatTokenCode(tag: { tag_code?: string; token_id?: string | null; min
   return '—'
 }
 
+type StickerPreset = '30mm' | '50mm' | 'sxsw'
+
+function getStickerLabel(preset: StickerPreset): string {
+  if (preset === 'sxsw') return 'SXSW (45×45mm)'
+  if (preset === '50mm') return '50×50mm'
+  return '30×30mm'
+}
+
+function sxswColorsByTag(tag: any): { bg: string; fg: string } {
+  const color = String(tag?.color || '').toLowerCase()
+  // Red tags: blue + creamy yellow
+  if (color.includes('red')) return { bg: '#3183fe', fg: '#fdfa00' }
+  // Pink tags (and fallback): lime + purple
+  return { bg: '#a4fe31', fg: '#a400fd' }
+}
+
+function hexToDashRgb(hex: string): string {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return `${r}-${g}-${b}`
+}
+
 // ── QR sticker HTML builder ────────────────────────────────────────────────────
-// Renders a single 30×30mm sticker cell. Used by both single and batch print.
-// Bottom line = token code (manual claim fallback), black, bold — replaces grey URL.
-function stickerHTML(tag: any): string {
+// Bottom line = token code (manual claim fallback), black, bold.
+function stickerHTML(tag: any, preset: StickerPreset): string {
   const url = tag.base_qr_url || `https://ranch-link.vercel.app/t/${tag.tag_code}`
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(url)}`
   const batchLabel = tag.batch_name || ''
   const specLine = [tag.color, tag.material?.split(' ')[0]].filter(Boolean).join(' · ')
   // Token code = manual claim ID. Format: RL-029-A3F2B1C4 (from tx hash) or RL-029-T<tokenId>.
   // For pre_identity tags (not yet minted), just use the tag code — farmer types this to claim.
   const tokenCode = formatTokenCode(tag)
   const claimCode = tokenCode !== '—' ? tokenCode : tag.tag_code
+
+  if (preset === 'sxsw') {
+    const { bg, fg } = sxswColorsByTag(tag)
+    const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=0&data=${encodeURIComponent(url)}&bgcolor=${hexToDashRgb(bg)}&color=${hexToDashRgb(fg)}`
+    return `
+      <div class="sticker sxsw">
+        <div class="sxsw-code">${tag.tag_code}</div>
+        ${batchLabel ? `<div class="sxsw-batch">${batchLabel}</div>` : ''}
+        ${specLine ? `<div class="sxsw-spec">${specLine}</div>` : ''}
+        <img class="sxsw-qr" src="${qrSrc}" />
+        <div class="sxsw-footer">
+          <span class="sxsw-logo">SXSW</span>
+          <span class="sxsw-year">26</span>
+        </div>
+        <div class="claim-code">${claimCode}</div>
+      </div>`
+  }
+
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=0&data=${encodeURIComponent(url)}`
   return `
     <div class="sticker">
       <div class="tag-code">${tag.tag_code}</div>
@@ -152,22 +193,22 @@ function stickerHTML(tag: any): string {
 }
 
 // Shared CSS for sticker layout — works centered on any paper size
-// sizeMm: 30 = 30×30mm (default), 50 = 50×50mm complementary option
-function getStickerCSS(sizeMm: 30 | 50): string {
-  const is50 = sizeMm === 50
-  const sticker = is50 ? '50mm' : '30mm'
-  const img = is50 ? '37mm' : '22mm'
-  const tagCodePt = is50 ? 11 : 6.5
-  const batchPt = is50 ? 7.5 : 4.5
-  const specPt = is50 ? 6.5 : 4
-  const claimPt = is50 ? 6.5 : 4
-  const claimMax = is50 ? '46mm' : '28mm'
+function getStickerCSS(preset: StickerPreset): string {
+  const is50 = preset === '50mm'
+  const isSXSW = preset === 'sxsw'
+  const sticker = isSXSW ? '45mm' : is50 ? '50mm' : '30mm'
+  const img = isSXSW ? '31mm' : is50 ? '37mm' : '22mm'
+  const tagCodePt = isSXSW ? 8.5 : is50 ? 11 : 6.5
+  const batchPt = isSXSW ? 6.5 : is50 ? 7.5 : 4.5
+  const specPt = isSXSW ? 5.5 : is50 ? 6.5 : 4
+  const claimPt = isSXSW ? 4.5 : is50 ? 6.5 : 4
+  const claimMax = isSXSW ? '40mm' : is50 ? '46mm' : '28mm'
   return `
   @page { margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: monospace; background: #fff; }
   .grid {
-    display: flex; flex-wrap: wrap; gap: ${is50 ? '6mm' : '4mm'};
+    display: flex; flex-wrap: wrap; gap: ${isSXSW ? '5mm' : is50 ? '6mm' : '4mm'};
     justify-content: flex-start; align-items: flex-start;
   }
   .sticker {
@@ -184,17 +225,30 @@ function getStickerCSS(sizeMm: 30 | 50): string {
   .claim-code { font-size: ${claimPt}pt; color: #000; font-weight: bold; margin-top: 0.4mm;
                 text-align: center; max-width: ${claimMax}; overflow: hidden;
                 white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.3px; }
+  .sxsw {
+    border: 0.3mm solid #333;
+    justify-content: flex-start;
+    padding: 1.2mm 1.2mm 1mm;
+    gap: 0.7mm;
+  }
+  .sxsw-code { font-size: ${tagCodePt}pt; font-weight: 800; letter-spacing: 0.2px; text-align: center; width: 100%; line-height: 1.05; }
+  .sxsw-batch { font-size: ${batchPt}pt; text-align: center; width: 100%; line-height: 1.05; }
+  .sxsw-spec { font-size: ${specPt}pt; text-align: center; width: 100%; line-height: 1.05; }
+  .sxsw-qr { width: ${img}; height: ${img}; display: block; margin: 0 auto; }
+  .sxsw-footer { width: 100%; display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.6mm; }
+  .sxsw-logo { font-size: 8.5pt; font-weight: 900; letter-spacing: 0.2px; }
+  .sxsw-year { font-size: 10pt; font-weight: 900; }
 `
 }
 
 // ── Individual QR print ────────────────────────────────────────────────────────
-function printSingleQR(tag: any, sizeMm: 30 | 50 = 30) {
+function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
   const win = window.open('', '_blank', 'width=500,height=400')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>QR ${tag.tag_code}</title>
-<style>${getStickerCSS(sizeMm)}</style></head>
-<body><div class="grid">${stickerHTML(tag)}</div>
+<style>${getStickerCSS(preset)}</style></head>
+<body><div class="grid">${stickerHTML(tag, preset)}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0;
   function tryPrint() { if (++loaded >= imgs.length) { window.print(); setTimeout(function(){ window.close(); }, 1000); } }
@@ -205,19 +259,19 @@ function printSingleQR(tag: any, sizeMm: 30 | 50 = 30) {
 }
 
 // ── Batch QR print — all tags from the same batch in one print job ─────────────
-function printBatchQR(tags: any[], sizeMm: 30 | 50 = 30) {
+function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
   if (!tags.length) return
   const batchName = tags[0].batch_name || 'Batch'
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
-  const stickers = tags.map(stickerHTML).join('')
+  const stickers = tags.map((tag) => stickerHTML(tag, preset)).join('')
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Batch ${batchName} — ${tags.length} tags</title>
-<style>${getStickerCSS(sizeMm)}
+<style>${getStickerCSS(preset)}
   h1 { font-size: 9pt; color: #555; margin-bottom: 4mm; font-family: monospace; }
 </style></head>
 <body>
-<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${sizeMm}×${sizeMm}mm</h1>
+<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${getStickerLabel(preset)}</h1>
 <div class="grid">${stickers}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0, total = imgs.length;
@@ -259,7 +313,7 @@ const STATUS_LABELS: Record<string, string> = {
 // ── Assemble Tab ──────────────────────────────────────────────────────────────
 // Workflow: 🖨️ Print QR → 🔧 Assemble → 🖨️ Confirm Print → 📥 Push to Inventory
 // Shipping is NOT part of this flow — it appears in Inventory after purchase/gift.
-function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
+function AssembleTab({ stickerSizeMm }: { stickerSizeMm: StickerPreset }) {
   const [tags, setTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -430,8 +484,8 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
                       <div className="bg-white p-1.5 rounded border-2 border-[var(--c2)]">
                         <QRCodeDisplay url={qrUrl} size={72} />
                       </div>
-                      <div className="text-[9px] text-[var(--c4)] font-mono text-center leading-tight max-w-[80px] break-all">
-                        {stickerSizeMm}mm × {stickerSizeMm}mm
+                      <div className="text-[9px] text-[var(--c4)] font-mono text-center leading-tight max-w-[90px] break-all">
+                        {getStickerLabel(stickerSizeMm)}
                       </div>
                     </div>
 
@@ -582,7 +636,7 @@ export default function SuperAdminPage() {
   const [itwInput, setItwInput] = useState<string>('11')
   const [batchName, setBatchName] = useState('')
   const [batchDate, setBatchDate] = useState<string>(new Date().toISOString().slice(0, 10))
-  const [stickerSizeMm, setStickerSizeMm] = useState<30 | 50>(30)
+  const [stickerSizeMm, setStickerSizeMm] = useState<StickerPreset>('30mm')
 
   // Latest batch state
   const [latestBatch, setLatestBatch] = useState<{
@@ -989,8 +1043,8 @@ export default function SuperAdminPage() {
                       <input
                         type="radio"
                         name="stickerSize"
-                        checked={stickerSizeMm === 30}
-                        onChange={() => setStickerSizeMm(30)}
+                        checked={stickerSizeMm === '30mm'}
+                        onChange={() => setStickerSizeMm('30mm')}
                         className="text-[var(--c2)]"
                       />
                       <span>30×30 mm</span>
@@ -999,11 +1053,21 @@ export default function SuperAdminPage() {
                       <input
                         type="radio"
                         name="stickerSize"
-                        checked={stickerSizeMm === 50}
-                        onChange={() => setStickerSizeMm(50)}
+                        checked={stickerSizeMm === '50mm'}
+                        onChange={() => setStickerSizeMm('50mm')}
                         className="text-[var(--c2)]"
                       />
                       <span>50×50 mm</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="stickerSize"
+                        checked={stickerSizeMm === 'sxsw'}
+                        onChange={() => setStickerSizeMm('sxsw')}
+                        className="text-[var(--c2)]"
+                      />
+                      <span>SXSW (45×45 mm)</span>
                     </label>
                   </div>
                   <p className="text-xs text-[var(--c4)] mt-1">Used for all Print QR actions (Assemble & Inventory)</p>
@@ -1210,7 +1274,7 @@ export default function SuperAdminPage() {
                                 {/* QR Code - Points to /t/[tag_code] */}
                                 <div className="mb-4">
                                   <div className="text-xs font-semibold mb-2 text-center bg-gradient-to-r from-[var(--c2)] to-[var(--c3)] text-white px-2 py-1 rounded">
-                                    QR Code ({stickerSizeMm}×{stickerSizeMm}mm)
+                                    QR Code ({getStickerLabel(stickerSizeMm)})
                                   </div>
                                   <div className="bg-white p-2 rounded border-4 border-[var(--c2)] flex justify-center print:border-2 print:border-black">
                                     <QRCodeDisplay url={device.base_qr_url} size={150} />
@@ -1511,7 +1575,7 @@ export default function SuperAdminPage() {
                               <button
                                 onClick={() => printSingleQR({ ...device, base_qr_url: device.base_qr_url || `https://ranch-link.vercel.app/t/${device.tag_code}` }, stickerSizeMm)}
                                 className="px-2 py-1 bg-[var(--bg-secondary)] border border-white/20 text-[var(--c4)] hover:text-white rounded text-xs"
-                                title={`Print ${stickerSizeMm}×${stickerSizeMm}mm QR sticker`}
+                                title={`Print ${getStickerLabel(stickerSizeMm)} QR sticker`}
                               >
                                 🖨️
                               </button>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getBasescanUrl } from '@/lib/blockchain/ranchLinkTag'
 import { getBuildBadgeText } from '@/lib/build-info'
 
@@ -80,20 +80,9 @@ export default function DashboardPage() {
   const [activationFilter, setActivationFilter] = useState<string>('all')
   const [onChainFilter, setOnChainFilter] = useState<string>('all')
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  // Refetch when user returns to this tab so newly created animals show without manual refresh
-  useEffect(() => {
-    const onFocus = () => fetchDashboardData()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [])
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       
       // TODO: Get current user's ranch_id from Supabase Auth
       // For now, we'll fetch all animals (will be filtered by ranch_id in production)
@@ -120,9 +109,32 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
+
+  // Live refresh: focus + visibility + periodic background refresh while tab is visible.
+  useEffect(() => {
+    const refresh = () => fetchDashboardData({ silent: true })
+    const onFocus = () => refresh()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refresh()
+    }, 15000)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [fetchDashboardData])
 
   const calculateStats = (animalsList: Animal[], tagsList: Tag[]): DashboardStats => {
     const activeAnimals = animalsList.filter(a => a.status === 'active').length
@@ -183,7 +195,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] py-8 px-4">
+    <div className="min-h-screen bg-[var(--bg)] py-4 sm:py-8 px-3 sm:px-4 overflow-x-hidden">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -317,10 +329,10 @@ export default function DashboardPage() {
                     <a
                       key={animal.id}
                       href={`/a/${animal.public_id}`}
-                      className="card hover:border-[var(--c2)] transition-colors"
+                      className="card hover:border-[var(--c2)] transition-colors min-w-0 overflow-hidden"
                     >
-                      <div className="flex items-start justify-between mb-4">
-                        <div>
+                      <div className="flex items-start justify-between mb-4 gap-3 min-w-0">
+                        <div className="min-w-0">
                           <h3 className="text-xl font-bold mb-1">{animal.name}</h3>
                           <p className="text-sm text-[var(--c4)] font-mono">{animal.public_id}</p>
                         </div>
@@ -371,10 +383,10 @@ export default function DashboardPage() {
                             <span className="font-mono font-semibold">{tag.tag_code}</span>
                           </div>
                           {tag.token_id && (
-                            <div className="flex items-center justify-between text-xs gap-2 min-w-0">
+                          <div className="flex items-start justify-between text-xs gap-2 min-w-0">
                               <span className="text-[var(--c4)] flex-shrink-0">Token ID:</span>
                               <span
-                                className="font-mono truncate text-right"
+                                className="font-mono text-right break-all leading-tight max-w-[65%]"
                                 title={`#${tag.token_id}`}
                               >
                                 #{tag.token_id}
