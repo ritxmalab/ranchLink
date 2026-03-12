@@ -9,6 +9,7 @@ const PRODUCTS_BASE = '/products'
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null
+const STRIPE_LOAD_TIMEOUT_MS = 5000
 
 /** Main pricing (digital/service) + physical catalog. Each item has 2–3 images (A/B/C). */
 const PRODUCT_CATALOG = [
@@ -91,7 +92,14 @@ export default function Home() {
 
       if (data.clientSecret) {
         try {
-          const stripe = stripePromise ? await stripePromise : null
+          const stripe = stripePromise
+            ? await Promise.race([
+                stripePromise,
+                new Promise<null>((resolve) => {
+                  setTimeout(() => resolve(null), STRIPE_LOAD_TIMEOUT_MS)
+                }),
+              ])
+            : null
           if (!stripe) {
             await startRedirectCheckout(tierKey)
             return
