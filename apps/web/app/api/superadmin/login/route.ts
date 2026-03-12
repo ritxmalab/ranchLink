@@ -8,8 +8,11 @@ export async function POST(request: NextRequest) {
   }
 
   const { username, password } = await request.json()
-  const expectedUsername = (process.env.SUPERADMIN_USERNAME || 'admin@example.com').trim().toLowerCase()
-  const correct = process.env.SUPERADMIN_PASSWORD || '[REDACTED]'
+  const expectedUsername = process.env.SUPERADMIN_USERNAME?.trim().toLowerCase() || ''
+  const correct = process.env.SUPERADMIN_PASSWORD || ''
+  if (!expectedUsername || !correct) {
+    return NextResponse.json({ error: 'Superadmin auth not configured' }, { status: 500 })
+  }
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'auth-audit-pre',hypothesisId:'H2',location:'api/superadmin/login/route.ts:POST:start',message:'Superadmin login attempt',data:{hasEnvPassword:Boolean(process.env.SUPERADMIN_PASSWORD),hasEnvUsername:Boolean(process.env.SUPERADMIN_USERNAME),providedUsernameLength:typeof username==='string'?username.length:0,providedPasswordLength:typeof password==='string'?password.length:0},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
@@ -23,6 +26,9 @@ export async function POST(request: NextRequest) {
   }
 
   const cookieValue = makeSuperadminSessionToken()
+  if (!cookieValue) {
+    return NextResponse.json({ error: 'Superadmin session secret missing' }, { status: 500 })
+  }
   const response = NextResponse.json({ success: true })
   // httpOnly + signed session token prevents client-side script spoofing.
   response.cookies.set('rl_superadmin', cookieValue, {

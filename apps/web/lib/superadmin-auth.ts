@@ -2,18 +2,20 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 const SUPERADMIN_COOKIE = 'rl_superadmin'
-const DEFAULT_PASSWORD = '[REDACTED]'
 const SESSION_TTL_SECONDS = 60 * 60 * 12 // 12h
 
 function getSessionSecret(): string {
   const envSecret = process.env.SUPERADMIN_SESSION_SECRET
   if (envSecret && envSecret.length >= 32) return envSecret
-  // Fallback uses password to keep app functional, but env secret is strongly recommended.
-  return process.env.SUPERADMIN_PASSWORD || DEFAULT_PASSWORD
+  // Fallback to configured admin password only when explicit session secret is absent.
+  // Never hardcode defaults in source.
+  return process.env.SUPERADMIN_PASSWORD || ''
 }
 
 function sign(payload: string): string {
-  return createHmac('sha256', getSessionSecret()).update(payload).digest('base64url')
+  const secret = getSessionSecret()
+  if (!secret) return ''
+  return createHmac('sha256', secret).update(payload).digest('base64url')
 }
 
 function encodePayload(data: Record<string, unknown>): string {
@@ -29,9 +31,11 @@ function decodePayload(raw: string): any | null {
 }
 
 export function makeSuperadminSessionToken(): string {
+  if (!getSessionSecret()) return ''
   const now = Math.floor(Date.now() / 1000)
   const payload = encodePayload({ iat: now, exp: now + SESSION_TTL_SECONDS, v: 1 })
   const signature = sign(payload)
+  if (!signature) return ''
   return `${payload}.${signature}`
 }
 
