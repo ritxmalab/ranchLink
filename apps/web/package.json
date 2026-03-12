@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.39.0",
     "date-fns": "^3.0.0",
     "jsqr": "^1.4.0",

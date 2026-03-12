@@ -1,10 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { loadStripe, type StripeEmbeddedCheckout } from '@stripe/stripe-js'
 import InteractiveCattleTag from '@/components/InteractiveCattleTag'
 import ProductCard from '@/components/ProductCard'
 
 const PRODUCTS_BASE = '/products'
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null
 
 /** Main pricing (digital/service) + physical catalog. Each item has 2–3 images (A/B/C). */
 const PRODUCT_CATALOG = [
@@ -26,6 +30,24 @@ const PRODUCT_CATALOG = [
 export default function Home() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
   const [buyingTierId, setBuyingTierId] = useState<string | null>(null)
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
+  const checkoutContainerRef = useRef<HTMLDivElement | null>(null)
+  const embeddedCheckoutRef = useRef<StripeEmbeddedCheckout | null>(null)
+
+  const closeEmbeddedCheckout = () => {
+    embeddedCheckoutRef.current?.destroy()
+    embeddedCheckoutRef.current = null
+    setIsCheckoutOpen(false)
+    setCheckoutMessage(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      embeddedCheckoutRef.current?.destroy()
+      embeddedCheckoutRef.current = null
+    }
+  }, [])
 
   const startCheckout = async (productId: string) => {
     const tierKey = productId === '0' ? 'single' : productId === '1' ? 'five_pack' : productId === '2' ? 'stack' : null
@@ -33,10 +55,11 @@ export default function Home() {
 
     try {
       setBuyingTierId(productId)
+      setCheckoutMessage(null)
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: tierKey }),
+        body: JSON.stringify({ tier: tierKey, mode: 'embedded' }),
       })
 
       if (!res.ok) {
@@ -45,7 +68,26 @@ export default function Home() {
         return
       }
 
-      const data = (await res.json()) as { url?: string }
+      const data = (await res.json()) as { url?: string; clientSecret?: string }
+
+      if (data.clientSecret && stripePromise) {
+        const stripe = await stripePromise
+        if (stripe) {
+          embeddedCheckoutRef.current?.destroy()
+          const embeddedCheckout = await stripe.initEmbeddedCheckout({
+            clientSecret: data.clientSecret,
+          })
+          embeddedCheckoutRef.current = embeddedCheckout
+          setIsCheckoutOpen(true)
+          setCheckoutMessage('Complete your payment securely without leaving this page.')
+          requestAnimationFrame(() => {
+            if (!checkoutContainerRef.current) return
+            embeddedCheckout.mount(checkoutContainerRef.current)
+          })
+          return
+        }
+      }
+
       if (data.url) {
         window.location.href = data.url
       } else {
@@ -189,6 +231,33 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {isCheckoutOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 p-3 sm:p-6 flex items-center justify-center"
+          onClick={closeEmbeddedCheckout}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[95vh] overflow-auto rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Secure Checkout</h3>
+              <button
+                type="button"
+                onClick={closeEmbeddedCheckout}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+            {checkoutMessage && (
+              <p className="px-4 pt-3 text-sm text-gray-600">{checkoutMessage}</p>
+            )}
+            <div ref={checkoutContainerRef} className="p-3 sm:p-4 min-h-[640px]" />
+          </div>
+        </div>
+      )}
     </main>
   )
 }

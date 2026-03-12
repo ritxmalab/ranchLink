@@ -16,6 +16,7 @@ const PRICE_MAP: Record<string, string | undefined> = {
 }
 
 type TierKey = keyof typeof PRICE_MAP
+type CheckoutMode = 'redirect' | 'embedded'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({} as any))
     const tier = body?.tier as TierKey | undefined
+    const checkoutMode =
+      body?.mode === 'embedded' || body?.mode === 'redirect'
+        ? (body.mode as CheckoutMode)
+        : 'redirect'
 
     if (!tier || !PRICE_MAP[tier]) {
       return NextResponse.json(
@@ -39,22 +44,41 @@ export async function POST(request: NextRequest) {
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://ranch-link.vercel.app'
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      customer_email: typeof body?.email === 'string' ? body.email : undefined,
-      line_items: [
-        {
-          price: PRICE_MAP[tier]!,
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        tier,
-      },
-      success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/?checkout=cancelled`,
-    })
+    const session = await stripe.checkout.sessions.create(
+      checkoutMode === 'embedded'
+        ? {
+            mode: 'payment',
+            ui_mode: 'embedded',
+            payment_method_types: ['card'],
+            customer_email: typeof body?.email === 'string' ? body.email : undefined,
+            line_items: [
+              {
+                price: PRICE_MAP[tier]!,
+                quantity: 1,
+              },
+            ],
+            metadata: {
+              tier,
+            },
+            return_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+          }
+        : {
+            mode: 'payment',
+            payment_method_types: ['card'],
+            customer_email: typeof body?.email === 'string' ? body.email : undefined,
+            line_items: [
+              {
+                price: PRICE_MAP[tier]!,
+                quantity: 1,
+              },
+            ],
+            metadata: {
+              tier,
+            },
+            success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${baseUrl}/?checkout=cancelled`,
+          }
+    )
 
     // Best-effort persistence of the created session. Webhook will finalize status.
     try {
@@ -83,7 +107,11 @@ export async function POST(request: NextRequest) {
       console.warn('Stripe checkout session persistence warning', persistError)
     }
 
-    return NextResponse.json({ url: session.url })
+    return NextResponse.json({
+      url: session.url,
+      clientSecret: session.client_secret,
+      mode: checkoutMode,
+    })
   } catch (error: any) {
     console.error('Stripe checkout error', error)
     return NextResponse.json(
