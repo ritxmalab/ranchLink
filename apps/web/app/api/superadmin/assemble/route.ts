@@ -81,9 +81,6 @@ export async function POST(request: NextRequest) {
     }
     const photoRows = await photoLookup.json()
     const assemblyPhotoUrl = photoRows?.[0]?.metadata?.assembly_photo_url
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H4',location:'api/superadmin/assemble/route.ts:pushGuard',message:'Push-to-inventory guard checked assembly photo',data:{tagId:validated.tag_id,tagCode,hasAssemblyPhoto:Boolean(assemblyPhotoUrl)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!assemblyPhotoUrl) {
       return NextResponse.json(
         { error: 'Assembly photo required before pushing to inventory' },

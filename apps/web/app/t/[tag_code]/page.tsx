@@ -178,9 +178,6 @@ export default function TagScanPage({ params }: PageProps) {
   const fetchTag = useCallback(async () => {
     try {
       setLoading(true)
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'t/[tag_code]/page.tsx:fetchTag',message:'fetchTag called',data:{tag_code,tag_code_type:typeof tag_code},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
       const response = await fetch(`/api/tags/${tag_code}`)
       if (!response.ok) {
         setError(response.status === 404 ? 'Tag not found' : 'Failed to load tag')
@@ -237,10 +234,6 @@ export default function TagScanPage({ params }: PageProps) {
       }
 
       setMintingStep(2) // Pinning to IPFS
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'t/[tag_code]/page.tsx:handleAttach',message:'sending attach',data:{tagCode:tag_code},hypothesisId:'H4',timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
       const response = await fetch('/api/attach-tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,10 +266,6 @@ export default function TagScanPage({ params }: PageProps) {
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to attach tag')
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/85a8db88-d50f-4beb-ac4a-a5101446f485',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'t/[tag_code]/page.tsx:attach response',message:'attach response received',data:{ok:response.ok,public_id:data?.public_id},hypothesisId:'H5',timestamp:Date.now()})}).catch(()=>{})
-      // #endregion
       setMintingStep(4) // Done
       setAttachSuccess(true)
 

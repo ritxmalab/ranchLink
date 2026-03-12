@@ -21,9 +21,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const tagCode = (formData.get('tag_code') as string | null)?.trim()
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H2',location:'api/superadmin/tag-photo/route.ts:start',message:'Tag photo upload request received',data:{hasFile:Boolean(file),tagCode:tagCode||null,fileType:file?.type||null,fileSize:file?.size||null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (!tagCode) return NextResponse.json({ error: 'tag_code is required' }, { status: 400 })
@@ -101,10 +98,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: error.message || 'Failed to create photo metadata row' }, { status: 500 })
       }
     }
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H2',location:'api/superadmin/tag-photo/route.ts:success',message:'Tag photo metadata persisted',data:{tagCode,cid,hasExistingRow:Boolean(existing?.tag_id),photoUrlExists:Boolean(photoUrl)},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     return NextResponse.json({ success: true, cid, tag_code: tagCode, photo_url: photoUrl })
   } catch (error: any) {

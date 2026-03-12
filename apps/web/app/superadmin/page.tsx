@@ -279,18 +279,12 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
 
   const handleAction = async (tagId: string, action: 'assemble' | 'push_to_inventory') => {
     setActionLoading(tagId + action)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H4',location:'superadmin/page.tsx:handleAction:start',message:'Assemble action started',data:{tagId,action},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const res = await fetch('/api/superadmin/assemble', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag_id: tagId, action, assembled_by: 'superadmin' }),
     })
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H4',location:'superadmin/page.tsx:handleAction:response',message:'Assemble action response',data:{tagId,action,status:res.status,ok:res.ok},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
       alert(`Action failed: ${err.error || err.message || 'Unknown error'}`)
@@ -314,9 +308,6 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
     if (!file) return
     setPhotoUploadingTagId(tag.id)
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H2',location:'superadmin/page.tsx:handlePhotoUpload:start',message:'Photo upload initiated',data:{tagCode:tag?.tag_code,fileType:file.type,fileSize:file.size},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       const formData = new FormData()
       formData.append('file', file)
       formData.append('tag_code', tag.tag_code)
@@ -326,9 +317,6 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: 30 | 50 }) {
         body: formData,
       })
       const data = await res.json()
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H2',location:'superadmin/page.tsx:handlePhotoUpload:response',message:'Photo upload response received',data:{tagCode:tag?.tag_code,status:res.status,ok:res.ok,hasPhotoUrl:Boolean(data?.photo_url)},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (!res.ok) {
         throw new Error(data.error || 'Photo upload failed')
       }
@@ -954,9 +942,6 @@ export default function SuperAdminPage() {
                       const valid = /^(\d+(\.\d*)?|\.\d+)$/.test(normalized)
                       if (!valid) return
                       const parsed = Number(normalized)
-                      // #region agent log
-                      fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H1',location:'superadmin/page.tsx:itw:onChange',message:'ITW input changed',data:{raw,normalized,valid,parsed:Number.isFinite(parsed)?parsed:null},timestamp:Date.now()})}).catch(()=>{});
-                      // #endregion
                       if (Number.isFinite(parsed) && parsed > 0) {
                         setItwGrams(parsed)
                       }
@@ -964,9 +949,6 @@ export default function SuperAdminPage() {
                     onBlur={() => {
                       const normalized = itwInput.replace(',', '.').trim()
                       const parsed = Number(normalized)
-                      // #region agent log
-                      fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'verification-pre',hypothesisId:'H1',location:'superadmin/page.tsx:itw:onBlur',message:'ITW input blur normalization',data:{itwInput,normalized,parsed:Number.isFinite(parsed)?parsed:null,currentItwGrams:itwGrams},timestamp:Date.now()})}).catch(()=>{});
-                      // #endregion
                       if (Number.isFinite(parsed) && parsed > 0) {
                         const rounded = Math.round(parsed * 100) / 100
                         setItwGrams(rounded)
