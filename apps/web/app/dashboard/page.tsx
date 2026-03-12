@@ -59,6 +59,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const [activeView, setActiveView] = useState<'animals' | 'inventory'>('animals')
+  const [isPublicMode, setIsPublicMode] = useState(false)
   const [animals, setAnimals] = useState<Animal[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [stats, setStats] = useState<DashboardStats>({
@@ -94,6 +95,8 @@ export default function DashboardPage() {
       
       const animalsData = await animalsResponse.json()
       const tagsData = await tagsResponse.json()
+      const publicMode = tagsData?.scope === 'public' || animalsData?.scope === 'public'
+      setIsPublicMode(publicMode)
       
       if (animalsData.animals) {
         setAnimals(animalsData.animals)
@@ -292,17 +295,25 @@ export default function DashboardPage() {
           >
             Animals View
           </button>
-          <button
-            onClick={() => setActiveView('inventory')}
-            className={`px-6 py-3 font-semibold border-b-2 transition-colors ${
-              activeView === 'inventory'
-                ? 'border-[var(--c2)] text-[var(--c2)]'
-                : 'border-transparent text-[var(--c4)] hover:text-[var(--c2)]'
-            }`}
-          >
-            Tag Inventory
-          </button>
+          {!isPublicMode && (
+            <button
+              onClick={() => setActiveView('inventory')}
+              className={`px-6 py-3 font-semibold border-b-2 transition-colors ${
+                activeView === 'inventory'
+                  ? 'border-[var(--c2)] text-[var(--c2)]'
+                  : 'border-transparent text-[var(--c4)] hover:text-[var(--c2)]'
+              }`}
+            >
+              Tag Inventory
+            </button>
+          )}
         </div>
+
+        {isPublicMode && (
+          <div className="mb-6 rounded-lg border border-[var(--c2)]/20 bg-[var(--bg-card)]/60 px-4 py-3 text-sm text-[var(--c4)]">
+            Public demo view: active animals and attached on-chain tags are visible. Inventory controls remain private.
+          </div>
+        )}
 
         {/* Animals View */}
         {activeView === 'animals' && (
@@ -431,7 +442,7 @@ export default function DashboardPage() {
         )}
 
         {/* Inventory View */}
-        {activeView === 'inventory' && (
+        {!isPublicMode && activeView === 'inventory' && (
           <div className="space-y-4">
             {/* Filters */}
             <div className="card">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
-import { verifySuperadminAuth } from '@/lib/superadmin-auth'
+import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,13 +11,11 @@ export const dynamic = 'force-dynamic'
  * so no animal is ever missing due to relation or timing.
  */
 export async function GET(request: NextRequest) {
-  const authError = verifySuperadminAuth(request)
-  if (authError) return authError
-
   try {
     const supabase = getSupabaseServerClient()
+    const isAdmin = isSuperadminAuthenticated(request)
 
-    const selectSpec = `
+    const adminSelectSpec = `
       *,
       tags (
         tag_code,
@@ -35,10 +33,72 @@ export async function GET(request: NextRequest) {
       )
     `
 
-    // 1) All animals ordered by created_at (primary source)
+    // Public mode keeps showcase visibility while preventing sensitive exposure.
+    if (!isAdmin) {
+      const { data: attachedTagRows, error } = await supabase
+        .from('tags')
+        .select(`
+          tag_code,
+          token_id,
+          mint_tx_hash,
+          chain,
+          contract_address,
+          status,
+          activation_state,
+          animal_id,
+          animals (
+            id,
+            public_id,
+            name,
+            species,
+            breed,
+            sex,
+            birth_year,
+            status,
+            photo_url
+          )
+        `)
+        .eq('status', 'attached')
+        .not('animal_id', 'is', null)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching public dashboard animals:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      const byAnimalId = new Map<string, any>()
+      for (const row of attachedTagRows || []) {
+        const animal = (row as any).animals
+        if (!animal?.id) continue
+        const entry = byAnimalId.get(animal.id)
+        const tag = {
+          tag_code: (row as any).tag_code,
+          token_id: (row as any).token_id,
+          mint_tx_hash: (row as any).mint_tx_hash,
+          chain: (row as any).chain,
+          contract_address: (row as any).contract_address,
+          status: (row as any).status,
+          activation_state: (row as any).activation_state,
+        }
+        if (!entry) {
+          byAnimalId.set(animal.id, { ...animal, tags: [tag] })
+        } else if (Array.isArray(entry.tags)) {
+          entry.tags.push(tag)
+        }
+      }
+
+      const animals = Array.from(byAnimalId.values())
+      const res = NextResponse.json({ animals, scope: 'public' })
+      res.headers.set('Cache-Control', 'no-store, must-revalidate')
+      res.headers.set('Pragma', 'no-cache')
+      return res
+    }
+
+    // 1) All animals ordered by created_at (admin source)
     const { data: animalsFromTable, error: err1 } = await supabase
       .from('animals')
-      .select(selectSpec)
+      .select(adminSelectSpec)
       .order('created_at', { ascending: false })
 
     if (err1) {
@@ -64,7 +124,7 @@ export async function GET(request: NextRequest) {
       if (missingIds.length) {
         const { data: extraAnimals, error: err3 } = await supabase
           .from('animals')
-          .select(selectSpec)
+          .select(adminSelectSpec)
           .in('id', missingIds)
         if (!err3 && extraAnimals?.length) {
           for (const a of extraAnimals) {
@@ -78,7 +138,7 @@ export async function GET(request: NextRequest) {
       (a, b) => new Date((b as any).created_at).getTime() - new Date((a as any).created_at).getTime()
     )
 
-    const res = NextResponse.json({ animals })
+    const res = NextResponse.json({ animals, scope: 'admin' })
     res.headers.set('Cache-Control', 'no-store, must-revalidate')
     res.headers.set('Pragma', 'no-cache')
     return res

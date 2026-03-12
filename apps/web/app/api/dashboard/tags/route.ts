@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
-import { verifySuperadminAuth } from '@/lib/superadmin-auth'
+import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,11 +12,9 @@ export const dynamic = 'force-dynamic'
  * For now, returns all tags (will be filtered by ranch_id in production)
  */
 export async function GET(request: NextRequest) {
-  const authError = verifySuperadminAuth(request)
-  if (authError) return authError
-
   try {
     const supabase = getSupabaseServerClient()
+    const isAdmin = isSuperadminAuthenticated(request)
 
     // TODO: Get current user's ranch_id from Supabase Auth
     // const { data: { user } } = await supabase.auth.getUser()
@@ -25,8 +23,9 @@ export async function GET(request: NextRequest) {
     //   return NextResponse.json({ tags: [] })
     // }
 
-    // For v1.0, fetch all tags (will be filtered by ranch_id in production)
-    const { data: tags, error } = await supabase
+    // Public mode: show only attached tags (demo-safe, no inventory leakage).
+    // Admin mode: show all tags for operational inventory management.
+    const baseQuery = supabase
       .from('tags')
       .select(`
         tag_code,
@@ -42,8 +41,10 @@ export async function GET(request: NextRequest) {
           name
         )
       `)
-      // .eq('ranch_id', userRanchId) // TODO: Uncomment when auth is implemented
       .order('created_at', { ascending: false })
+
+    const query = isAdmin ? baseQuery : baseQuery.eq('status', 'attached')
+    const { data: tags, error } = await query
 
     if (error) {
       console.error('Error fetching tags:', error)
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const res = NextResponse.json({ tags: tags || [] })
+    const res = NextResponse.json({ tags: tags || [], scope: isAdmin ? 'admin' : 'public' })
     res.headers.set('Cache-Control', 'no-store, must-revalidate')
     res.headers.set('Pragma', 'no-cache')
     return res
