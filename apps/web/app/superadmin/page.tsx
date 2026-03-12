@@ -669,6 +669,9 @@ export default function SuperAdminPage() {
     const hasCookie = document.cookie
       .split(';')
       .some(c => c.trim().startsWith('rl_superadmin=') && c.trim().split('=')[1]?.trim().length > 0)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'auth-audit-pre',hypothesisId:'H4',location:'app/superadmin/page.tsx:authEffect',message:'Client superadmin cookie gate evaluated',data:{cookieStringLength:document.cookie.length,hasSuperadminCookie:hasCookie},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setAuthed(hasCookie)
   }, [])
 
