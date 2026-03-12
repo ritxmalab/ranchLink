@@ -180,7 +180,6 @@ function stickerHTML(tag: any, preset: StickerPreset): string {
           <span class="sxsw-logo">SXSW</span>
           <span class="sxsw-year">26</span>
         </div>
-        <div class="claim-code">${claimCode}</div>
       </div>`
   }
 
@@ -200,10 +199,10 @@ function getStickerCSS(preset: StickerPreset): string {
   const is50 = preset === '50mm'
   const isSXSW = preset === 'sxsw'
   const sticker = isSXSW ? '45mm' : is50 ? '50mm' : '30mm'
-  const img = isSXSW ? '31mm' : is50 ? '37mm' : '22mm'
-  const tagCodePt = isSXSW ? 8.5 : is50 ? 11 : 6.5
-  const batchPt = isSXSW ? 6.5 : is50 ? 7.5 : 4.5
-  const specPt = isSXSW ? 5.5 : is50 ? 6.5 : 4
+  const img = isSXSW ? '28mm' : is50 ? '37mm' : '22mm'
+  const tagCodePt = isSXSW ? 8 : is50 ? 11 : 6.5
+  const batchPt = isSXSW ? 5.5 : is50 ? 7.5 : 4.5
+  const specPt = isSXSW ? 4.8 : is50 ? 6.5 : 4
   const claimPt = isSXSW ? 4.5 : is50 ? 6.5 : 4
   const claimMax = isSXSW ? '40mm' : is50 ? '46mm' : '28mm'
   // #region agent log
@@ -232,18 +231,18 @@ function getStickerCSS(preset: StickerPreset): string {
                 text-align: center; max-width: ${claimMax}; overflow: hidden;
                 white-space: nowrap; text-overflow: ellipsis; letter-spacing: 0.3px; }
   .sxsw {
-    border: 0.3mm solid #333;
+    border: 0.25mm solid #333;
     justify-content: flex-start;
-    padding: 1.2mm 1.2mm 1mm;
-    gap: 0.7mm;
+    padding: 0.9mm 1mm 0.8mm;
+    gap: 0.35mm;
   }
-  .sxsw-code { font-size: ${tagCodePt}pt; font-weight: 800; letter-spacing: 0.2px; text-align: center; width: 100%; line-height: 1.05; }
-  .sxsw-batch { font-size: ${batchPt}pt; text-align: center; width: 100%; line-height: 1.05; }
-  .sxsw-spec { font-size: ${specPt}pt; text-align: center; width: 100%; line-height: 1.05; }
+  .sxsw-code { font-size: ${tagCodePt}pt; font-weight: 800; letter-spacing: 0.2px; text-align: center; width: 100%; line-height: 1; }
+  .sxsw-batch { font-size: ${batchPt}pt; text-align: center; width: 100%; line-height: 1; }
+  .sxsw-spec { font-size: ${specPt}pt; text-align: center; width: 100%; line-height: 1; }
   .sxsw-qr { width: ${img}; height: ${img}; display: block; margin: 0 auto; }
-  .sxsw-footer { width: 100%; display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.6mm; }
-  .sxsw-logo { font-size: 8.5pt; font-weight: 900; letter-spacing: 0.2px; }
-  .sxsw-year { font-size: 10pt; font-weight: 900; }
+  .sxsw-footer { width: 100%; display: flex; justify-content: space-between; align-items: baseline; margin-top: 0.2mm; }
+  .sxsw-logo { font-size: 7.4pt; font-weight: 900; letter-spacing: 0.2px; }
+  .sxsw-year { font-size: 8.8pt; font-weight: 900; }
 `
 }
 
