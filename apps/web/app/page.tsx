@@ -49,6 +49,25 @@ export default function Home() {
     }
   }, [])
 
+  const startRedirectCheckout = async (tierKey: 'single' | 'five_pack' | 'stack') => {
+    const redirectRes = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier: tierKey, mode: 'redirect' }),
+    })
+
+    if (!redirectRes.ok) {
+      throw new Error(`Redirect checkout failed with status ${redirectRes.status}`)
+    }
+
+    const redirectData = (await redirectRes.json()) as { url?: string }
+    if (!redirectData.url) {
+      throw new Error('Redirect checkout URL missing')
+    }
+
+    window.location.href = redirectData.url
+  }
+
   const startCheckout = async (productId: string) => {
     const tierKey = productId === '0' ? 'single' : productId === '1' ? 'five_pack' : productId === '2' ? 'stack' : null
     if (!tierKey) return
@@ -70,9 +89,14 @@ export default function Home() {
 
       const data = (await res.json()) as { url?: string; clientSecret?: string }
 
-      if (data.clientSecret && stripePromise) {
-        const stripe = await stripePromise
-        if (stripe) {
+      if (data.clientSecret) {
+        try {
+          const stripe = stripePromise ? await stripePromise : null
+          if (!stripe) {
+            await startRedirectCheckout(tierKey)
+            return
+          }
+
           embeddedCheckoutRef.current?.destroy()
           const embeddedCheckout = await stripe.initEmbeddedCheckout({
             clientSecret: data.clientSecret,
@@ -84,6 +108,10 @@ export default function Home() {
             if (!checkoutContainerRef.current) return
             embeddedCheckout.mount(checkoutContainerRef.current)
           })
+          return
+        } catch (embeddedError) {
+          console.warn('Embedded checkout fallback to redirect', embeddedError)
+          await startRedirectCheckout(tierKey)
           return
         }
       }
