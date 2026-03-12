@@ -137,6 +137,23 @@ function getStickerLabel(preset: StickerPreset): string {
   return '30×30mm'
 }
 
+function isSxswTag(tag: any): boolean {
+  const batch = String(tag?.batch_name || '').toLowerCase()
+  const model = String(tag?.model || '').toLowerCase()
+  return batch.includes('sxsw') || model.includes('sxsw')
+}
+
+function resolveStickerPresetForTag(tag: any, selectedPreset: StickerPreset): StickerPreset {
+  // SXSW special-edition tags always print in SXSW format/colors.
+  if (isSxswTag(tag)) return 'sxsw'
+  return selectedPreset
+}
+
+function resolveStickerPresetForBatch(tags: any[], selectedPreset: StickerPreset): StickerPreset {
+  if (tags.some((t) => isSxswTag(t))) return 'sxsw'
+  return selectedPreset
+}
+
 function sxswColorsByTag(tag: any): { bg: string; fg: string } {
   const color = String(tag?.color || '').toLowerCase()
   // Red tags: blue + creamy yellow
@@ -248,6 +265,7 @@ function getStickerCSS(preset: StickerPreset): string {
 
 // ── Individual QR print ────────────────────────────────────────────────────────
 function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
+  const effectivePreset = resolveStickerPresetForTag(tag, preset)
   const win = window.open('', '_blank', 'width=500,height=400')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
   // #region agent log
@@ -255,8 +273,8 @@ function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
   // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>QR ${tag.tag_code}</title>
-<style>${getStickerCSS(preset)}</style></head>
-<body><div class="grid">${stickerHTML(tag, preset)}</div>
+<style>${getStickerCSS(effectivePreset)}</style></head>
+<body><div class="grid">${stickerHTML(tag, effectivePreset)}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0;
   function tryPrint() { if (++loaded >= imgs.length) { window.print(); setTimeout(function(){ window.close(); }, 1000); } }
@@ -269,20 +287,21 @@ function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
 // ── Batch QR print — all tags from the same batch in one print job ─────────────
 function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
   if (!tags.length) return
+  const effectivePreset = resolveStickerPresetForBatch(tags, preset)
   const batchName = tags[0].batch_name || 'Batch'
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
-  const stickers = tags.map((tag) => stickerHTML(tag, preset)).join('')
+  const stickers = tags.map((tag) => stickerHTML(tag, effectivePreset)).join('')
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H4',location:'superadmin/page.tsx:printBatchQR:start',message:'Print batch started',data:{preset,batchName,count:tags.length,firstTag:tags?.[0]?.tag_code||null,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H4',location:'superadmin/page.tsx:printBatchQR:start',message:'Print batch started',data:{preset,effectivePreset,batchName,count:tags.length,firstTag:tags?.[0]?.tag_code||null,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Batch ${batchName} — ${tags.length} tags</title>
-<style>${getStickerCSS(preset)}
+<style>${getStickerCSS(effectivePreset)}
   h1 { font-size: 9pt; color: #555; margin-bottom: 4mm; font-family: monospace; }
 </style></head>
 <body>
-<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${getStickerLabel(preset)}</h1>
+<h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${getStickerLabel(effectivePreset)}</h1>
 <div class="grid">${stickers}</div>
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0, total = imgs.length;
