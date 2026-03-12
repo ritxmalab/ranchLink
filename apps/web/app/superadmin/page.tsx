@@ -166,6 +166,9 @@ function stickerHTML(tag: any, preset: StickerPreset): string {
 
   if (preset === 'sxsw') {
     const { bg, fg } = sxswColorsByTag(tag)
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H1',location:'superadmin/page.tsx:stickerHTML:sxsw',message:'SXSW sticker content generated',data:{tagCode:tag?.tag_code||null,batch:tag?.batch_name||null,claimCodeLength:String(claimCode||'').length,specLineLength:String(specLine||'').length,color:tag?.color||null,bg,fg},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=0&data=${encodeURIComponent(url)}&bgcolor=${hexToDashRgb(bg)}&color=${hexToDashRgb(fg)}`
     return `
       <div class="sticker sxsw">
@@ -203,6 +206,9 @@ function getStickerCSS(preset: StickerPreset): string {
   const specPt = isSXSW ? 5.5 : is50 ? 6.5 : 4
   const claimPt = isSXSW ? 4.5 : is50 ? 6.5 : 4
   const claimMax = isSXSW ? '40mm' : is50 ? '46mm' : '28mm'
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H2',location:'superadmin/page.tsx:getStickerCSS',message:'Computed print CSS dimensions',data:{preset,sticker,img,tagCodePt,batchPt,specPt,claimPt,claimMax,gap:isSXSW?'5mm':is50?'6mm':'4mm'},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   return `
   @page { margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -245,6 +251,9 @@ function getStickerCSS(preset: StickerPreset): string {
 function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
   const win = window.open('', '_blank', 'width=500,height=400')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H3',location:'superadmin/page.tsx:printSingleQR:start',message:'Print single started',data:{tagCode:tag?.tag_code||null,preset,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>QR ${tag.tag_code}</title>
 <style>${getStickerCSS(preset)}</style></head>
@@ -265,6 +274,9 @@ function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
   const stickers = tags.map((tag) => stickerHTML(tag, preset)).join('')
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H4',location:'superadmin/page.tsx:printBatchQR:start',message:'Print batch started',data:{preset,batchName,count:tags.length,firstTag:tags?.[0]?.tag_code||null,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Batch ${batchName} — ${tags.length} tags</title>
 <style>${getStickerCSS(preset)}
