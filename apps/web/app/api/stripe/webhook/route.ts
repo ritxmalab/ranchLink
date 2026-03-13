@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { getTierTagCount, makeOrderNumber } from '@/lib/orders'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,6 +20,60 @@ function normalizeStatus(
   if (paymentStatus === 'paid') return 'paid'
   if (paymentStatus === 'no_payment_required') return 'paid'
   return 'pending'
+}
+
+function normalizeFulfillmentStatus(paymentStatus: string | null | undefined): string {
+  if (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') {
+    return 'paid_unfulfilled'
+  }
+  return 'pending_payment'
+}
+
+async function sendOrderEmail(params: {
+  to: string
+  orderNumber: string
+  amountTotal: number | null
+  currency: string | null
+  tagCount: number
+  tier: string | null | undefined
+}) {
+  const apiKey = process.env.RESEND_API_KEY
+  const from = process.env.ORDER_EMAIL_FROM
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+  if (!apiKey || !from) return
+
+  const formattedAmount =
+    params.amountTotal && params.currency
+      ? new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: params.currency.toUpperCase(),
+        }).format(params.amountTotal / 100)
+      : 'N/A'
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      subject: `RanchLink order confirmation ${params.orderNumber}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
+          <h2>Thanks for your RanchLink purchase</h2>
+          <p>Your order is confirmed and now in the production queue.</p>
+          <p><strong>Order:</strong> ${params.orderNumber}<br/>
+          <strong>Tier:</strong> ${params.tier || 'N/A'}<br/>
+          <strong>Tag quantity:</strong> ${params.tagCount}<br/>
+          <strong>Total:</strong> ${formattedAmount}</p>
+          <p>You can track your order status here:<br/>
+          <a href="${appUrl}/order/${params.orderNumber}">${appUrl}/order/${params.orderNumber}</a></p>
+        </div>
+      `,
+    }),
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -64,20 +119,35 @@ export async function POST(request: NextRequest) {
       : session.payment_intent?.id
 
   const status = normalizeStatus(event.type, session.payment_status)
+  const tier = session.metadata?.tier ?? null
+  const tagCount =
+    Number(session.metadata?.tag_count ?? 0) || getTierTagCount(tier)
+  const orderNumber = makeOrderNumber({
+    checkoutSessionId: session.id,
+  })
+  const shippingAddress = session.customer_details?.address ?? null
+  const shippingName = session.customer_details?.name ?? null
+  const shippingPhone = session.customer_details?.phone ?? null
 
   try {
     const supabase = getSupabaseServerClient()
     const { error } = await supabase.from('stripe_orders').upsert(
       {
+        order_number: orderNumber,
         stripe_checkout_session_id: session.id,
         stripe_payment_intent_id: paymentIntentId ?? null,
         customer_email: session.customer_details?.email ?? null,
         customer_name: session.customer_details?.name ?? null,
-        tier: session.metadata?.tier ?? null,
+        tier,
+        tag_count: tagCount,
         amount_total: session.amount_total ?? null,
         currency: session.currency ?? null,
         payment_status: session.payment_status ?? 'unpaid',
         status,
+        fulfillment_status: normalizeFulfillmentStatus(session.payment_status),
+        shipping_name: shippingName,
+        shipping_phone: shippingPhone,
+        shipping_address_json: shippingAddress,
         metadata: session.metadata ?? {},
       },
       { onConflict: 'stripe_checkout_session_id' }
@@ -94,6 +164,21 @@ export async function POST(request: NextRequest) {
       { error: 'Webhook persistence failed', details: error?.message || 'Unknown error' },
       { status: 500 }
     )
+  }
+
+  if (status === 'paid' && session.customer_details?.email) {
+    try {
+      await sendOrderEmail({
+        to: session.customer_details.email,
+        orderNumber,
+        amountTotal: session.amount_total ?? null,
+        currency: session.currency ?? null,
+        tagCount,
+        tier,
+      })
+    } catch (emailError) {
+      console.warn('Order email warning', emailError)
+    }
   }
 
   return NextResponse.json({ received: true })

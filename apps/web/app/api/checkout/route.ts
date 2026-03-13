@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { getTierTagCount, makeOrderNumber } from '@/lib/orders'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,6 +51,11 @@ export async function POST(request: NextRequest) {
             mode: 'payment',
             ui_mode: 'embedded',
             payment_method_types: ['card'],
+            billing_address_collection: 'required',
+            phone_number_collection: { enabled: true },
+            shipping_address_collection: {
+              allowed_countries: ['US', 'CA', 'MX'],
+            },
             customer_email: typeof body?.email === 'string' ? body.email : undefined,
             line_items: [
               {
@@ -59,12 +65,18 @@ export async function POST(request: NextRequest) {
             ],
             metadata: {
               tier,
+              tag_count: String(getTierTagCount(tier)),
             },
-            return_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            return_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
           }
         : {
             mode: 'payment',
             payment_method_types: ['card'],
+            billing_address_collection: 'required',
+            phone_number_collection: { enabled: true },
+            shipping_address_collection: {
+              allowed_countries: ['US', 'CA', 'MX'],
+            },
             customer_email: typeof body?.email === 'string' ? body.email : undefined,
             line_items: [
               {
@@ -74,9 +86,10 @@ export async function POST(request: NextRequest) {
             ],
             metadata: {
               tier,
+              tag_count: String(getTierTagCount(tier)),
             },
-            success_url: `${baseUrl}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${baseUrl}/?checkout=cancelled`,
+            success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${baseUrl}/checkout/cancelled`,
           }
     )
 
@@ -87,18 +100,25 @@ export async function POST(request: NextRequest) {
         typeof session.payment_intent === 'string'
           ? session.payment_intent
           : session.payment_intent?.id
+      const orderNumber = makeOrderNumber({
+        checkoutSessionId: session.id,
+      })
+      const tagCount = getTierTagCount(tier)
 
       await supabase.from('stripe_orders').upsert(
         {
+          order_number: orderNumber,
           stripe_checkout_session_id: session.id,
           stripe_payment_intent_id: paymentIntentId ?? null,
           customer_email: session.customer_details?.email ?? null,
           customer_name: session.customer_details?.name ?? null,
           tier,
+          tag_count: tagCount,
           amount_total: session.amount_total ?? null,
           currency: session.currency ?? null,
           payment_status: session.payment_status ?? 'unpaid',
           status: 'created',
+          fulfillment_status: 'pending_payment',
           metadata: session.metadata ?? {},
         },
         { onConflict: 'stripe_checkout_session_id' }

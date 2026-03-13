@@ -96,6 +96,28 @@ interface Device {
   metadata?: Record<string, any>
 }
 
+interface SalesOrder {
+  order_number: string | null
+  stripe_checkout_session_id: string
+  customer_email: string | null
+  tier: string | null
+  tag_count: number
+  amount_total: number | null
+  currency: string | null
+  payment_status: string
+  fulfillment_status: string
+  status: string
+  created_at: string
+}
+
+interface SalesMetrics {
+  orders_total: number
+  orders_paid: number
+  revenue_total_cents: number
+  pending_fulfillment: number
+  tags_scheduled_to_build: number
+}
+
 const mapDevice = (device: any): Device => {
   const metadata = device.metadata || {}
   const appUrl = typeof window !== 'undefined' 
@@ -655,15 +677,18 @@ function AssembleTab({ stickerSizeMm }: { stickerSizeMm: StickerPreset }) {
 
 export default function SuperAdminPage() {
   const [authed, setAuthed] = useState<boolean | null>(null)
-  const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory'>('factory')
+  const [activeTab, setActiveTab] = useState<'factory' | 'assemble' | 'dashboard' | 'inventory' | 'orders'>('factory')
 
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedBatch, setSelectedBatch] = useState<string>('')
   const [batches, setBatches] = useState<Batch[]>([])
   const [isLoadingDevices, setIsLoadingDevices] = useState(false)
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [orders, setOrders] = useState<SalesOrder[]>([])
+  const [salesMetrics, setSalesMetrics] = useState<SalesMetrics | null>(null)
 
   // Factory form state
   const [batchSize, setBatchSize] = useState(3)
@@ -701,6 +726,22 @@ export default function SuperAdminPage() {
       setErrorMessage(error.message)
     } finally {
       setIsLoadingDevices(false)
+    }
+  }, [])
+
+  const fetchOrders = useCallback(async () => {
+    setIsLoadingOrders(true)
+    try {
+      const response = await fetch('/api/superadmin/orders', { credentials: 'include' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to load orders')
+      setOrders(data.orders || [])
+      setSalesMetrics(data.metrics || null)
+    } catch (error: any) {
+      console.error(error)
+      setErrorMessage(error.message || 'Failed to load orders')
+    } finally {
+      setIsLoadingOrders(false)
     }
   }, [])
 
@@ -879,6 +920,7 @@ export default function SuperAdminPage() {
     { id: 'assemble', label: '📦 Assemble' },
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'inventory', label: '🗂️ Inventory' },
+    { id: 'orders', label: '💳 Orders' },
   ]
 
   return (
@@ -1731,6 +1773,146 @@ export default function SuperAdminPage() {
               })()}
               </>
             )}
+          </div>
+        )}
+
+        {/* Orders Tab */}
+        {activeTab === 'orders' && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Sales & Orders</h2>
+              <button
+                onClick={fetchOrders}
+                className="btn-secondary"
+                disabled={isLoadingOrders}
+              >
+                {isLoadingOrders ? 'Loading...' : '🔄 Refresh'}
+              </button>
+            </div>
+
+            {!salesMetrics && !isLoadingOrders && (
+              <div className="mb-4">
+                <button onClick={fetchOrders} className="btn-primary">Load order metrics</button>
+              </div>
+            )}
+
+            {salesMetrics && (
+              <div className="grid md:grid-cols-5 gap-4 mb-6">
+                <div className="card text-center">
+                  <div className="text-2xl font-bold text-[var(--c2)]">{salesMetrics.orders_total}</div>
+                  <div className="text-xs text-[var(--c4)]">Orders total</div>
+                </div>
+                <div className="card text-center">
+                  <div className="text-2xl font-bold text-green-500">{salesMetrics.orders_paid}</div>
+                  <div className="text-xs text-[var(--c4)]">Paid orders</div>
+                </div>
+                <div className="card text-center">
+                  <div className="text-2xl font-bold text-emerald-400">
+                    ${(salesMetrics.revenue_total_cents / 100).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-[var(--c4)]">Revenue</div>
+                </div>
+                <div className="card text-center">
+                  <div className="text-2xl font-bold text-yellow-400">{salesMetrics.pending_fulfillment}</div>
+                  <div className="text-xs text-[var(--c4)]">Pending fulfillment</div>
+                </div>
+                <div className="card text-center">
+                  <div className="text-2xl font-bold text-indigo-400">{salesMetrics.tags_scheduled_to_build}</div>
+                  <div className="text-xs text-[var(--c4)]">Tags to build</div>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left py-2 px-3">Order</th>
+                    <th className="text-left py-2 px-3">Customer</th>
+                    <th className="text-left py-2 px-3">Tier</th>
+                    <th className="text-left py-2 px-3">Tags</th>
+                    <th className="text-left py-2 px-3">Amount</th>
+                    <th className="text-left py-2 px-3">Payment</th>
+                    <th className="text-left py-2 px-3">Fulfillment</th>
+                    <th className="text-left py-2 px-3">Created</th>
+                    <th className="text-left py-2 px-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.stripe_checkout_session_id} className="border-b border-white/5">
+                      <td className="py-2 px-3 font-mono">{order.order_number || 'Pending...'}</td>
+                      <td className="py-2 px-3">{order.customer_email || 'N/A'}</td>
+                      <td className="py-2 px-3">{order.tier || 'N/A'}</td>
+                      <td className="py-2 px-3">{order.tag_count || 0}</td>
+                      <td className="py-2 px-3">
+                        {order.amount_total && order.currency
+                          ? new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: order.currency.toUpperCase(),
+                            }).format(order.amount_total / 100)
+                          : 'N/A'}
+                      </td>
+                      <td className="py-2 px-3 capitalize">{order.payment_status}</td>
+                      <td className="py-2 px-3 capitalize">{order.fulfillment_status?.replace(/_/g, ' ') || 'N/A'}</td>
+                      <td className="py-2 px-3">{new Date(order.created_at).toLocaleString()}</td>
+                      <td className="py-2 px-3">
+                        {order.order_number && (
+                          <select
+                            defaultValue=""
+                            className="text-xs bg-[var(--bg-secondary)] border border-white/20 rounded px-1 py-1"
+                            onChange={async (e) => {
+                              const selected = e.target.value
+                              e.target.value = ''
+                              if (!selected) return
+
+                              let carrier: string | null = null
+                              let trackingNumber: string | null = null
+                              let trackingUrl: string | null = null
+
+                              if (selected === 'shipped') {
+                                carrier = window.prompt('Carrier (UPS/FedEx/USPS):', '') || null
+                                trackingNumber = window.prompt('Tracking number:', '') || null
+                                trackingUrl = window.prompt('Tracking URL (optional):', '') || null
+                              }
+
+                              const response = await fetch('/api/superadmin/orders', {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  order_number: order.order_number,
+                                  fulfillment_status: selected,
+                                  carrier,
+                                  tracking_number: trackingNumber,
+                                  tracking_url: trackingUrl,
+                                }),
+                              })
+                              const data = await response.json()
+                              if (!response.ok) {
+                                alert(`Failed to update order: ${data.error || 'Unknown error'}`)
+                                return
+                              }
+                              await fetchOrders()
+                            }}
+                          >
+                            <option value="">Set status ▾</option>
+                            <option value="paid_unfulfilled">Paid / Unfulfilled</option>
+                            <option value="packed">Packed</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!orders.length && !isLoadingOrders && (
+                <div className="py-8 text-center text-[var(--c4)]">No orders yet.</div>
+              )}
+            </div>
           </div>
         )}
       </div>
