@@ -12,9 +12,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseServerClient()
     const { data, error } = await supabase
       .from('stripe_orders')
-      .select(
-        'order_number, stripe_checkout_session_id, customer_email, tier, tag_count, amount_total, currency, payment_status, fulfillment_status, status, created_at'
-      )
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(100)
 
@@ -22,7 +20,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const paidOrders = (data || []).filter(
+    const normalizedOrders = (data || []).map((row: any) => ({
+      order_number: row.order_number || null,
+      stripe_checkout_session_id: row.stripe_checkout_session_id,
+      customer_email: row.customer_email ?? null,
+      tier: row.tier ?? null,
+      tag_count: row.tag_count ?? 0,
+      amount_total: row.amount_total ?? null,
+      currency: row.currency ?? null,
+      payment_status: row.payment_status || 'unpaid',
+      fulfillment_status: row.fulfillment_status || 'pending_payment',
+      status: row.status || 'created',
+      created_at: row.created_at,
+    }))
+
+    const paidOrders = normalizedOrders.filter(
       (row) => row.payment_status === 'paid' || row.payment_status === 'no_payment_required'
     )
     const totalRevenueCents = paidOrders.reduce((sum, row) => sum + (row.amount_total || 0), 0)
@@ -32,9 +44,9 @@ export async function GET(request: NextRequest) {
     ).length
 
     return NextResponse.json({
-      orders: data || [],
+      orders: normalizedOrders,
       metrics: {
-        orders_total: (data || []).length,
+        orders_total: normalizedOrders.length,
         orders_paid: paidOrders.length,
         revenue_total_cents: totalRevenueCents,
         pending_fulfillment: pendingFulfillment,
@@ -98,7 +110,18 @@ export async function POST(request: NextRequest) {
       .select('order_number, fulfillment_status, carrier, tracking_number, tracking_url')
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      if (/column .* does not exist/i.test(error.message || '')) {
+        return NextResponse.json(
+          {
+            error:
+              'Fulfillment columns are not migrated yet. Run ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql in Supabase first.',
+          },
+          { status: 400 }
+        )
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
     return NextResponse.json({ order: data })
   } catch (error: any) {
     return NextResponse.json(

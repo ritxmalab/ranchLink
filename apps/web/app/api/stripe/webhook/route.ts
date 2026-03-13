@@ -131,27 +131,48 @@ export async function POST(request: NextRequest) {
 
   try {
     const supabase = getSupabaseServerClient()
-    const { error } = await supabase.from('stripe_orders').upsert(
-      {
-        order_number: orderNumber,
+    const enhancedPayload = {
+      order_number: orderNumber,
+      stripe_checkout_session_id: session.id,
+      stripe_payment_intent_id: paymentIntentId ?? null,
+      customer_email: session.customer_details?.email ?? null,
+      customer_name: session.customer_details?.name ?? null,
+      tier,
+      tag_count: tagCount,
+      amount_total: session.amount_total ?? null,
+      currency: session.currency ?? null,
+      payment_status: session.payment_status ?? 'unpaid',
+      status,
+      fulfillment_status: normalizeFulfillmentStatus(session.payment_status),
+      shipping_name: shippingName,
+      shipping_phone: shippingPhone,
+      shipping_address_json: shippingAddress,
+      metadata: session.metadata ?? {},
+    }
+
+    let { error } = await supabase.from('stripe_orders').upsert(
+      enhancedPayload,
+      { onConflict: 'stripe_checkout_session_id' }
+    )
+
+    // Backward-compatible fallback if new fulfillment columns are not migrated yet.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      const legacyPayload = {
         stripe_checkout_session_id: session.id,
         stripe_payment_intent_id: paymentIntentId ?? null,
         customer_email: session.customer_details?.email ?? null,
         customer_name: session.customer_details?.name ?? null,
         tier,
-        tag_count: tagCount,
         amount_total: session.amount_total ?? null,
         currency: session.currency ?? null,
         payment_status: session.payment_status ?? 'unpaid',
         status,
-        fulfillment_status: normalizeFulfillmentStatus(session.payment_status),
-        shipping_name: shippingName,
-        shipping_phone: shippingPhone,
-        shipping_address_json: shippingAddress,
         metadata: session.metadata ?? {},
-      },
-      { onConflict: 'stripe_checkout_session_id' }
-    )
+      }
+      ;({ error } = await supabase
+        .from('stripe_orders')
+        .upsert(legacyPayload, { onConflict: 'stripe_checkout_session_id' }))
+    }
 
     if (error) {
       return NextResponse.json(

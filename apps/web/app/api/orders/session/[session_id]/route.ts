@@ -16,9 +16,7 @@ export async function GET(
     const supabase = getSupabaseServerClient()
     const { data, error } = await supabase
       .from('stripe_orders')
-      .select(
-        'order_number, stripe_checkout_session_id, payment_status, fulfillment_status, status, amount_total, currency, tag_count, customer_email, created_at'
-      )
+      .select('*')
       .eq('stripe_checkout_session_id', session_id)
       .single()
 
@@ -26,7 +24,20 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ order: data })
+    return NextResponse.json({
+      order: {
+        order_number: data.order_number || null,
+        stripe_checkout_session_id: data.stripe_checkout_session_id,
+        payment_status: data.payment_status || 'unpaid',
+        fulfillment_status: data.fulfillment_status || 'pending_payment',
+        status: data.status || 'created',
+        amount_total: data.amount_total ?? null,
+        currency: data.currency ?? null,
+        tag_count: data.tag_count ?? 0,
+        customer_email: data.customer_email ?? null,
+        created_at: data.created_at,
+      },
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: 'Unable to fetch order', details: error?.message || 'Unknown error' },
