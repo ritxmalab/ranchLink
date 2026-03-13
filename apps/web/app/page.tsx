@@ -10,6 +10,8 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null
 const STRIPE_LOAD_TIMEOUT_MS = 5000
+const EMBEDDED_CONTAINER_TIMEOUT_MS = 3000
+const EMBEDDED_MOUNT_WATCHDOG_MS = 4000
 
 /** Main pricing (digital/service) + physical catalog. Each item has 2–3 images (A/B/C). */
 const PRODUCT_CATALOG = [
@@ -35,8 +37,17 @@ export default function Home() {
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null)
   const checkoutContainerRef = useRef<HTMLDivElement | null>(null)
   const embeddedCheckoutRef = useRef<StripeEmbeddedCheckout | null>(null)
+  const mountWatchdogRef = useRef<number | null>(null)
+
+  const clearMountWatchdog = () => {
+    if (mountWatchdogRef.current !== null) {
+      window.clearTimeout(mountWatchdogRef.current)
+      mountWatchdogRef.current = null
+    }
+  }
 
   const closeEmbeddedCheckout = () => {
+    clearMountWatchdog()
     embeddedCheckoutRef.current?.destroy()
     embeddedCheckoutRef.current = null
     setIsCheckoutOpen(false)
@@ -45,10 +56,34 @@ export default function Home() {
 
   useEffect(() => {
     return () => {
+      clearMountWatchdog()
       embeddedCheckoutRef.current?.destroy()
       embeddedCheckoutRef.current = null
     }
   }, [])
+
+  const shouldForceRedirectCheckout = () => {
+    if (typeof window === 'undefined') return false
+
+    const ua = window.navigator.userAgent || ''
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua)
+    const isInAppBrowser =
+      /(FBAN|FBAV|Instagram|Line\/|MicroMessenger|WhatsApp|Messenger|TikTok|Snapchat)/i.test(ua)
+    const isAndroidWebView = /\bwv\b|; wv\)/i.test(ua)
+    const isIosWebView = /AppleWebKit/i.test(ua) && /Mobile/i.test(ua) && !/Safari/i.test(ua)
+
+    // Embedded checkout can fail silently in several webviews; always use redirect there.
+    return isInAppBrowser || isAndroidWebView || isIosWebView || isMobile
+  }
+
+  const waitForCheckoutContainer = async () => {
+    const startedAt = Date.now()
+    while (Date.now() - startedAt < EMBEDDED_CONTAINER_TIMEOUT_MS) {
+      if (checkoutContainerRef.current) return checkoutContainerRef.current
+      await new Promise((resolve) => window.setTimeout(resolve, 50))
+    }
+    return null
+  }
 
   const startRedirectCheckout = async (tierKey: 'single' | 'five_pack' | 'stack') => {
     const redirectRes = await fetch('/api/checkout', {
@@ -76,6 +111,12 @@ export default function Home() {
     try {
       setBuyingTierId(productId)
       setCheckoutMessage(null)
+
+      if (shouldForceRedirectCheckout()) {
+        await startRedirectCheckout(tierKey)
+        return
+      }
+
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,7 +125,7 @@ export default function Home() {
 
       if (!res.ok) {
         console.error('Checkout failed with status', res.status)
-        alert('Could not start checkout. Please try again.')
+        await startRedirectCheckout(tierKey)
         return
       }
 
@@ -112,10 +153,25 @@ export default function Home() {
           embeddedCheckoutRef.current = embeddedCheckout
           setIsCheckoutOpen(true)
           setCheckoutMessage('Complete your payment securely without leaving this page.')
-          requestAnimationFrame(() => {
-            if (!checkoutContainerRef.current) return
-            embeddedCheckout.mount(checkoutContainerRef.current)
-          })
+          const checkoutContainer = await waitForCheckoutContainer()
+          if (!checkoutContainer) {
+            throw new Error('Embedded checkout container did not render in time')
+          }
+          embeddedCheckout.mount(checkoutContainer)
+          clearMountWatchdog()
+          mountWatchdogRef.current = window.setTimeout(async () => {
+            const hasMountedFrame =
+              !!checkoutContainerRef.current?.querySelector('iframe')
+            if (hasMountedFrame) return
+
+            closeEmbeddedCheckout()
+            try {
+              await startRedirectCheckout(tierKey)
+            } catch (redirectError) {
+              console.error('Redirect fallback after mount watchdog failed', redirectError)
+              alert('Could not start checkout. Please try again.')
+            }
+          }, EMBEDDED_MOUNT_WATCHDOG_MS)
           return
         } catch (embeddedError) {
           console.warn('Embedded checkout fallback to redirect', embeddedError)
