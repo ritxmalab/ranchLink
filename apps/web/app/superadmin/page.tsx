@@ -269,18 +269,14 @@ function getStickerCSS(preset: StickerPreset): string {
     background: #fff;
   }
   .grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: ${gap};
-    justify-content: flex-start;
-    align-items: flex-start;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    display: block;
   }
   .sticker {
     width: ${sticker};
     height: ${sticker};
-    display: flex;
+    display: inline-block;
+    margin-right: ${gap};
+    margin-bottom: ${gap};
     flex-direction: column;
     align-items: center;
     justify-content: center;
