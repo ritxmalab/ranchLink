@@ -194,6 +194,16 @@ function sxswColorsByTag(tag: any): { bg: string; fg: string } {
   return { bg: '#a4fe31', fg: '#a400fd' }
 }
 
+function stickersPerPage(preset: StickerPreset): number {
+  // Conservative counts so no label is ever cut on A4/Letter/Legal when printed at 100% scale.
+  // SXSW preset 45×45mm: 3×4 grid = 12 labels per page.
+  if (preset === 'sxsw') return 12
+  // 50mm: also cap at 12 (3×4) to keep generous margins.
+  if (preset === '50mm') return 12
+  // 30mm: allow more rows/cols; 24 is a safe upper bound.
+  return 24
+}
+
 function hexToDashRgb(hex: string): string {
   const clean = hex.replace('#', '')
   const r = parseInt(clean.slice(0, 2), 16)
@@ -268,6 +278,12 @@ function getStickerCSS(preset: StickerPreset): string {
     font-family: monospace;
     background: #fff;
   }
+  .page {
+    page-break-after: always;
+  }
+  .page:last-child {
+    page-break-after: auto;
+  }
   .grid {
     display: block;
   }
@@ -336,7 +352,14 @@ function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
   const batchName = tags[0].batch_name || 'Batch'
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
-  const stickers = tags.map((tag) => stickerHTML(tag, effectivePreset)).join('')
+  const perPage = stickersPerPage(effectivePreset)
+  const pages: string[] = []
+  for (let i = 0; i < tags.length; i += perPage) {
+    const slice = tags.slice(i, i + perPage)
+    const stickersHtml = slice.map((tag) => stickerHTML(tag, effectivePreset)).join('')
+    pages.push(`<div class="page"><div class="grid">${stickersHtml}</div></div>`)
+  }
+  const pagesHtml = pages.join('')
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H4',location:'superadmin/page.tsx:printBatchQR:start',message:'Print batch started',data:{preset,effectivePreset,batchName,count:tags.length,firstTag:tags?.[0]?.tag_code||null,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
@@ -347,7 +370,7 @@ function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
 </style></head>
 <body>
 <h1>🐄 RanchLink · ${batchName} · ${tags.length} tags · ${getStickerLabel(effectivePreset)}</h1>
-<div class="grid">${stickers}</div>
+${pagesHtml}
 <script>
   var imgs = document.querySelectorAll('img'), loaded = 0, total = imgs.length;
   function tryPrint() { if (++loaded >= total) { window.print(); setTimeout(function(){ window.close(); }, 1200); } }
