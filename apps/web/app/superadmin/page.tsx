@@ -254,23 +254,40 @@ function getStickerCSS(preset: StickerPreset): string {
   const specPt = isSXSW ? 4.8 : is50 ? 6.5 : 4
   const claimPt = isSXSW ? 4.5 : is50 ? 6.5 : 4
   const claimMax = isSXSW ? '40mm' : is50 ? '46mm' : '28mm'
+  const gap = isSXSW ? '5mm' : is50 ? '6mm' : '4mm'
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H2',location:'superadmin/page.tsx:getStickerCSS',message:'Computed print CSS dimensions',data:{preset,sticker,img,tagCodePt,batchPt,specPt,claimPt,claimMax,gap:isSXSW?'5mm':is50?'6mm':'4mm'},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   return `
-  @page { margin: 10mm; }
+  @page {
+    margin: 10mm;
+    size: auto;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: monospace; background: #fff; }
+  html, body {
+    font-family: monospace;
+    background: #fff;
+  }
   .grid {
-    display: flex; flex-wrap: wrap; gap: ${isSXSW ? '5mm' : is50 ? '6mm' : '4mm'};
-    justify-content: flex-start; align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: ${gap};
+    justify-content: flex-start;
+    align-items: flex-start;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .sticker {
-    width: ${sticker}; height: ${sticker};
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    width: ${sticker};
+    height: ${sticker};
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     border: 0.3mm dashed #ccc;
-    overflow: hidden; page-break-inside: avoid;
+    overflow: hidden;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
   .tag-code   { font-size: ${tagCodePt}pt; font-weight: bold; letter-spacing: 0.5px; margin-bottom: 0.3mm; }
   .batch-name { font-size: ${batchPt}pt; color: #333; margin-bottom: 0.3mm; letter-spacing: 0.2px; }
