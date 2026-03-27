@@ -21,13 +21,13 @@ const PRODUCT_CATALOG = [
   { id: '2', title: 'Stack', nameCode: undefined, price: '$27.49', material: undefined, itemCount: undefined, features: ['10 QR tags', 'Public cards', 'NFT ownership', 'Optional refill service'], images: ['/3.png', '/interaction/6.png'], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'stack' as const },
   { id: '3', title: 'Custom', nameCode: undefined, price: 'Contact Us', material: undefined, itemCount: undefined, features: ['Bulk orders', 'Custom colors', 'Enterprise', 'Refill service available'], images: ['/4.png'], imgBg: 'bg-[var(--c3)]/10', isContact: true, stripeTierKey: null },
   // —— Physical / labels (from design ref + zip) ——
-  { id: 'label-100', title: 'RanchLink Label', nameCode: 'RL-LABEL', price: '$9.99', material: undefined, itemCount: 100, features: ['Batch of 100', 'QR labels'], images: [`${PRODUCTS_BASE}/RL-LABEL.svg`], imgBg: 'bg-[var(--bg-secondary)]', isContact: false, stripeTierKey: null },
-  { id: 'tpp-1', title: 'Translucid PETG', nameCode: 'RL-TPP', price: '$1.99', material: 'Translucid PETG', itemCount: 1, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-A.png`, `${PRODUCTS_BASE}/RL-TPP-B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
-  { id: 'tpp-5', title: 'Translucid PETG 5-Pack', nameCode: 'RL-TPP-5', price: '$6.99', material: 'Translucid PETG', itemCount: 5, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-4A.png`, `${PRODUCTS_BASE}/RL-TPP-4B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
-  { id: 'tpp-15', title: 'Translucid PETG 15-Pack', nameCode: 'RL-TPP-15', price: '$31.89', material: 'Translucid PETG', itemCount: 15, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-15A.png`, `${PRODUCTS_BASE}/RL-TPP-15B.png`, `${PRODUCTS_BASE}/RL-TPP-15C.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
-  { id: 'o-3', title: 'Orange 3-Pack', nameCode: 'RL-O-3', price: '$3.33', material: 'PETG-HF', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-O-3A.png`, `${PRODUCTS_BASE}/RL-O-3B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
-  { id: 'ya-3', title: 'Yellow ABS 3-Pack', nameCode: 'RL-YA-3', price: '$3.99', material: 'ABS', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-YA%2B-3A.png`, `${PRODUCTS_BASE}/RL-YA%2B-3B.png`], imgBg: 'bg-[var(--c3)]/10', isContact: false, stripeTierKey: null },
-  { id: 'fb-3', title: 'Fluorescent PETG 3-Pack', nameCode: 'RL-FB', price: '$3.99', material: 'Fluorescent PETG', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-FBA.png`, `${PRODUCTS_BASE}/RL-FBB.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: null },
+  { id: 'label-100', title: 'RanchLink Label', nameCode: 'RL-LABEL', price: '$9.99', material: undefined, itemCount: 100, features: ['Batch of 100', 'QR labels'], images: [`${PRODUCTS_BASE}/RL-LABEL.svg`], imgBg: 'bg-[var(--bg-secondary)]', isContact: false, stripeTierKey: 'label_100' as const },
+  { id: 'tpp-1', title: 'Translucid PETG', nameCode: 'RL-TPP', price: '$1.99', material: 'Translucid PETG', itemCount: 1, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-A.png`, `${PRODUCTS_BASE}/RL-TPP-B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'tpp_1' as const },
+  { id: 'tpp-5', title: 'Translucid PETG 5-Pack', nameCode: 'RL-TPP-5', price: '$6.99', material: 'Translucid PETG', itemCount: 5, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-4A.png`, `${PRODUCTS_BASE}/RL-TPP-4B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'tpp_5' as const },
+  { id: 'tpp-15', title: 'Translucid PETG 15-Pack', nameCode: 'RL-TPP-15', price: '$31.89', material: 'Translucid PETG', itemCount: 15, features: [], images: [`${PRODUCTS_BASE}/RL-TPP-15A.png`, `${PRODUCTS_BASE}/RL-TPP-15B.png`, `${PRODUCTS_BASE}/RL-TPP-15C.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'tpp_15' as const },
+  { id: 'o-3', title: 'Orange 3-Pack', nameCode: 'RL-O-3', price: '$3.33', material: 'PETG-HF', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-O-3A.png`, `${PRODUCTS_BASE}/RL-O-3B.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'orange_3' as const },
+  { id: 'ya-3', title: 'Yellow ABS 3-Pack', nameCode: 'RL-YA-3', price: '$3.99', material: 'ABS', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-YA%2B-3A.png`, `${PRODUCTS_BASE}/RL-YA%2B-3B.png`], imgBg: 'bg-[var(--c3)]/10', isContact: false, stripeTierKey: 'yellow_abs_3' as const },
+  { id: 'fb-3', title: 'Fluorescent PETG 3-Pack', nameCode: 'RL-FB', price: '$3.99', material: 'Fluorescent PETG', itemCount: 3, features: [], images: [`${PRODUCTS_BASE}/RL-FBA.png`, `${PRODUCTS_BASE}/RL-FBB.png`], imgBg: 'bg-[var(--c2)]/10', isContact: false, stripeTierKey: 'fluoro_3' as const },
 ]
 
 export default function Home() {
@@ -85,7 +85,7 @@ export default function Home() {
     return null
   }
 
-  const startRedirectCheckout = async (tierKey: 'single' | 'five_pack' | 'stack') => {
+  const startRedirectCheckout = async (tierKey: string) => {
     const redirectRes = await fetch('/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,7 +105,8 @@ export default function Home() {
   }
 
   const startCheckout = async (productId: string) => {
-    const tierKey = productId === '0' ? 'single' : productId === '1' ? 'five_pack' : productId === '2' ? 'stack' : null
+    const product = PRODUCT_CATALOG.find(p => p.id === productId)
+    const tierKey = product?.stripeTierKey ?? null
     if (!tierKey) return
 
     try {

@@ -55,8 +55,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard" className="text-sm text-[var(--c4)] hover:text-[var(--c2)] transition-colors">
-                  Dashboard
+                <Link href="/ranch" className="text-sm text-[var(--c4)] hover:text-[var(--c2)] transition-colors">
+                  My Ranch
                 </Link>
               </li>
               <li>
@@ -72,8 +72,8 @@ export default function Footer() {
             <h4 className="text-sm font-semibold text-[var(--c1)] uppercase tracking-wider mb-4">
               Contact
             </h4>
-            <a href="mailto:hello@ritxma.com?subject=RanchLink" className="text-sm text-[var(--c4)] hover:text-[var(--c2)] transition-colors">
-              hello@ritxma.com
+            <a href="mailto:solve@ritxma.com?subject=RanchLink" className="text-sm text-[var(--c4)] hover:text-[var(--c2)] transition-colors">
+              solve@ritxma.com
             </a>
           </div>
         </div>

@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-02 (session 5 — batch fix, production batches, third-party claim) | **Build:** f7487d5 | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-24 (session 7 — full auth, ranch dashboard, purchase flow, security) | **Build:** TBD | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -334,3 +334,106 @@ Before writing any code, confirm these in order:
 
 ### Dashboard animal count
 - User expects **9 animals** on the public dashboard. If the API returns 8, the 9th may be Thomas/Tomas (test claim from Yellow batch) — confirm attach completed and animal has `tag_id` / is included in dashboard merge. Logic: primary query from `animals` plus animals linked from `tags` (status attached, animal_id not null); merged by id, sorted by `created_at` desc; refetch on window focus.
+
+---
+
+## 16. Session 7 — Full Auth, Ranch Dashboard, Purchase, Security (2026-03-24)
+
+### What was built
+
+#### A. Database Migration (`supabase/migrations/007_RANCH_USERS_AUTH_RLS.sql`)
+- `claim_secret` UUID column on `tags` table — generated at batch creation, used in QR URL
+- `ranch_users` table — rancher accounts (email, phone, ranch_id, verified flags)
+- `verification_codes` table — OTP PINs with expiry, purpose, attempt limits
+- `ranch_sessions` table — token-based auth sessions
+- `animal_events` table — health checks, vaccinations, treatments, weights, movements, breeding, calving, notes
+- **Comprehensive RLS**: all 11 tables enabled. Public-readable: animals, tags, ranches, batches, animal_events, kits, kit_tags. Locked down: stripe_orders, ranch_users, verification_codes, ranch_sessions
+
+#### B. Customer Authentication System
+- **`lib/ranch-auth.ts`** — OTP generation, Resend email sending, code verification, session management (cookie `rl_session`, 30-day TTL)
+- **`/api/auth/send-code`** — sends 6-digit PIN to email
+- **`/api/auth/verify-code`** — validates PIN, creates/finds ranch user + ranch, sets session cookie
+- **`/api/auth/login`** — login flow for existing users
+- **`/api/auth/session`** — GET checks session, DELETE logs out
+
+#### C. Claiming Flow Update (`/t/[tag_code]/page.tsx`)
+- 3-step flow: Identity → OTP → Animal Form
+- Collects email (required), phone, name before allowing claim
+- Session check on load — returning users skip to form
+- `claim_secret` generated per tag in factory batch creation
+- QR URLs now include `?s=<claim_secret>` for new batches
+- Backward compatible: tags without claim_secret still claimable
+
+#### D. Ranch Admin Dashboard (`/ranch/page.tsx`)
+- Full customer admin panel (NOT superadmin)
+- Login via email OTP
+- Dashboard: animal count, on-chain stats, tagged stats, active stats
+- Animal grid/list view with search by name, ID, breed, tag code
+- Animal detail view with info cards, photo, event timeline
+- Event management: add health checks, vaccinations, treatments, weight records, etc.
+- Livestock management features reference: Boviq, Abrook, Stockbooks, Ranchr capabilities
+- **APIs**: `/api/ranch/animals`, `/api/ranch/events`
+
+#### E. Purchase Flow
+- All 10 products now have Stripe `stripeTierKey` assignments
+- Checkout API expanded: `STRIPE_PRICE_LABEL_100`, `STRIPE_PRICE_TPP_*`, `STRIPE_PRICE_ORANGE_3`, `STRIPE_PRICE_YELLOW_ABS_3`, `STRIPE_PRICE_FLUORO_3`
+- `startCheckout` uses product's `stripeTierKey` directly (no hardcoded mapping)
+- `orders.ts` expanded with tag counts for all tiers
+- Email updated from `hello@ritxma.com` → `solve@ritxma.com` (Footer, ProductCard)
+- Footer: "Dashboard" link changed to "My Ranch" → `/ranch`
+
+#### F. Security Hardening
+- **RLS on all tables** (see §A above)
+- **Security headers** in `next.config.js`: X-Content-Type-Options, X-Frame-Options DENY, X-XSS-Protection, Referrer-Policy, Permissions-Policy
+- **Public animal cards** (`/a/*`) get SAMEORIGIN frame policy + brief caching for demo perf
+- **Order lookup API** (`/api/orders/[order_number]`): PII redacted (email masked, phone/address removed from public response)
+- **Health endpoint** (`/api/health`): public callers get minimal `healthy`/`unhealthy`; full diagnostics only for superadmin
+- **Superadmin orders API**: expanded to return full pipeline data (shipping, tracking, carrier)
+
+#### G. Factory — claim_secret
+- `api/factory/batches/route.ts` now generates `claim_secret` UUID per tag
+- Response includes `claim_url` with embedded secret for QR printing
+- Existing tags without `claim_secret` remain claimable (backward compat)
+
+### Files created/modified
+| File | Action |
+|------|--------|
+| `supabase/migrations/007_RANCH_USERS_AUTH_RLS.sql` | **NEW** — full migration |
+| `apps/web/lib/ranch-auth.ts` | **NEW** — auth library |
+| `apps/web/app/api/auth/send-code/route.ts` | **NEW** — send OTP |
+| `apps/web/app/api/auth/verify-code/route.ts` | **NEW** — verify OTP + create session |
+| `apps/web/app/api/auth/login/route.ts` | **NEW** — login flow |
+| `apps/web/app/api/auth/session/route.ts` | **NEW** — session check/logout |
+| `apps/web/app/api/ranch/animals/route.ts` | **NEW** — ranch animals |
+| `apps/web/app/api/ranch/events/route.ts` | **NEW** — animal events CRUD |
+| `apps/web/app/ranch/page.tsx` | **NEW** — ranch admin dashboard |
+| `apps/web/app/t/[tag_code]/page.tsx` | **MODIFIED** — identity verification gate |
+| `apps/web/app/api/factory/batches/route.ts` | **MODIFIED** — claim_secret + claim_url |
+| `apps/web/app/api/checkout/route.ts` | **MODIFIED** — expanded price map |
+| `apps/web/app/api/orders/[order_number]/route.ts` | **MODIFIED** — PII redaction |
+| `apps/web/app/api/health/route.ts` | **MODIFIED** — gated diagnostics |
+| `apps/web/app/api/superadmin/orders/route.ts` | **MODIFIED** — full pipeline data |
+| `apps/web/app/page.tsx` | **MODIFIED** — all products wired to Stripe |
+| `apps/web/components/ProductCard.tsx` | **MODIFIED** — email + type fix |
+| `apps/web/components/Footer.tsx` | **MODIFIED** — email + ranch link |
+| `apps/web/next.config.js` | **MODIFIED** — security headers |
+| `apps/web/lib/orders.ts` | **MODIFIED** — expanded tier counts |
+| `apps/web/.env.local.example` | **MODIFIED** — new Stripe price env vars |
+
+### Deploy checklist
+1. **Run SQL migration** `007_RANCH_USERS_AUTH_RLS.sql` in Supabase SQL Editor
+2. **Set env vars on Vercel**:
+   - `ORDER_EMAIL_FROM=RanchLink <solve@ritxma.com>` (for Resend)
+   - `RESEND_API_KEY=re_...` (must be configured for auth emails)
+   - `STRIPE_PRICE_LABEL_100`, `STRIPE_PRICE_TPP_1`, etc. — create prices in Stripe Dashboard
+3. **Push + deploy** to Vercel
+4. **Test flows**: purchase → order email → order tracking → superadmin orders → fulfillment
+5. **Test flows**: scan QR → identity → PIN → claim → ranch dashboard → events
+
+### What remains (next session)
+- Custodial wallet creation per ranch (CDP integration)
+- SMS verification via Twilio (currently email-only)
+- Claim_secret validation enforcement (currently claim works without `?s=` for backward compat)
+- NFT transfer to farmer's custodial wallet
+- CRM / marketing integrations
+- Legal / compliance documentation

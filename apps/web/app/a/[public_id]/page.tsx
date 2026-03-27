@@ -14,6 +14,7 @@ interface Animal {
   birth_year: number | null
   size: string | null
   status: string
+  ranch_id: string | null
   // IDENTIFICATION
   eid: string | null
   secondary_id: string | null
@@ -43,6 +44,7 @@ interface Animal {
     contract_address: string | null
     status: string
     activation_state: string
+    owner_user_id: string | null
   }>
   ranches?: {
     id: string
@@ -85,6 +87,20 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
   const [error, setError] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(false)
   const [isSuperadminView, setIsSuperadminView] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginCode, setLoginCode] = useState('')
+  const [loginStep, setLoginStep] = useState<'email' | 'code'>('email')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [needsIdentity, setNeedsIdentity] = useState(false)
+  const [finalizeToken, setFinalizeToken] = useState<string | null>(null)
+  const [sessionRanchId, setSessionRanchId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [finalizeName, setFinalizeName] = useState('')
+  const [finalizePhone, setFinalizePhone] = useState('')
+  const [finalizeSuccess, setFinalizeSuccess] = useState(false)
 
   // Update form state
   const [showUpdateForm, setShowUpdateForm] = useState(false)
@@ -98,10 +114,11 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
   useEffect(() => {
     fetchAnimal()
-    // Check owner cookie client-side (set at attach time)
-    setIsOwner(!!getOwnerCookie(public_id))
-    // Check if opened from superadmin (?superadmin=1) and validate via server session.
     const params = new URLSearchParams(window.location.search)
+
+    const token = params.get('finalize')
+    if (token) setFinalizeToken(token)
+
     if (params.get('superadmin') === '1') {
       fetch('/api/superadmin/session', { credentials: 'include' })
         .then(r => r.json())
@@ -110,7 +127,27 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
     } else {
       setIsSuperadminView(false)
     }
+
+    fetch('/api/auth/session', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.authenticated && data.ranch_id) {
+          setSessionRanchId(data.ranch_id)
+        }
+        setSessionChecked(true)
+      })
+      .catch(() => setSessionChecked(true))
   }, [public_id])
+
+  useEffect(() => {
+    if (!animal) return
+    const cookieOwner = !!getOwnerCookie(public_id)
+    const sessionOwner = !!sessionRanchId && sessionRanchId === animal.ranch_id
+    setIsOwner(cookieOwner || sessionOwner)
+
+    const tag = animal.tags?.[0]
+    setNeedsIdentity(!!tag && !tag.owner_user_id)
+  }, [animal, sessionRanchId, public_id])
 
   const fetchAnimal = async () => {
     try {
@@ -197,6 +234,108 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
       setUpdateMsg('❌ ' + err.message)
     } finally {
       setUpdateSubmitting(false)
+    }
+  }
+
+  const handleEditClick = () => {
+    setActionError(null)
+    if (showUpdateForm) {
+      setShowUpdateForm(false)
+      return
+    }
+    if (isSuperadminView || isOwner) {
+      setShowUpdateForm(true)
+      return
+    }
+    if (!sessionChecked) return
+    if (!sessionRanchId) {
+      setShowLoginModal(true)
+      return
+    }
+    setActionError("You don't own this animal")
+  }
+
+  const handleSendCode = async () => {
+    setLoginLoading(true)
+    setLoginError(null)
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: loginEmail,
+          phone: finalizePhone || undefined,
+          purpose: finalizeToken ? 'claim' : 'login',
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setLoginStep('code')
+      } else {
+        setLoginError(data.error || 'Failed to send code')
+      }
+    } catch {
+      setLoginError('Network error')
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleVerifyCode = async () => {
+    setLoginLoading(true)
+    setLoginError(null)
+    try {
+      const res = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, code: loginCode, purpose: 'login' }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setShowLoginModal(false)
+        setLoginStep('email')
+        setLoginEmail('')
+        setLoginCode('')
+        window.location.reload()
+      } else {
+        setLoginError(data.error || 'Verification failed')
+      }
+    } catch {
+      setLoginError('Network error')
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleFinalizeClaim = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoginLoading(true)
+    setLoginError(null)
+    try {
+      const res = await fetch('/api/auth/finalize-claim', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: finalizeToken,
+          email: loginEmail,
+          code: loginCode,
+          phone: finalizePhone || undefined,
+          name: finalizeName || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setFinalizeSuccess(true)
+        setTimeout(() => window.location.reload(), 2000)
+      } else {
+        setLoginError(data.error || 'Claim failed')
+      }
+    } catch {
+      setLoginError('Network error')
+    } finally {
+      setLoginLoading(false)
     }
   }
 
@@ -290,6 +429,63 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
             </div>
           </div>
         </div>
+
+        {/* Finalize Claim */}
+        {finalizeToken && !finalizeSuccess && (
+          <div className="card mb-4 border-2 border-[var(--c2)]/40 bg-gradient-to-br from-cyan-900/10 to-blue-900/10">
+            <h3 className="text-xl font-bold mb-2">Verify Your Identity</h3>
+            <p className="text-sm text-[var(--c4)] mb-4">Complete verification to claim ownership of this animal.</p>
+            <form onSubmit={handleFinalizeClaim} className="space-y-3">
+              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
+                placeholder="Email" required
+                className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none" />
+              <input type="text" value={finalizeName} onChange={e => setFinalizeName(e.target.value)}
+                placeholder="Your name (optional)"
+                className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none" />
+              <input type="tel" value={finalizePhone} onChange={e => setFinalizePhone(e.target.value)}
+                placeholder="Phone (optional)"
+                className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none" />
+              {loginStep === 'email' ? (
+                <button type="button" onClick={handleSendCode} disabled={loginLoading || !loginEmail}
+                  className="btn-primary w-full">
+                  {loginLoading ? 'Sending...' : 'Send Verification Code'}
+                </button>
+              ) : (
+                <>
+                  <input type="text" inputMode="numeric" maxLength={6} value={loginCode}
+                    onChange={e => setLoginCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit code"
+                    className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none text-center text-2xl tracking-[0.3em] font-mono" />
+                  <button type="submit" disabled={loginLoading || loginCode.length !== 6}
+                    className="btn-primary w-full">
+                    {loginLoading ? 'Verifying...' : 'Verify & Claim'}
+                  </button>
+                </>
+              )}
+              {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+            </form>
+          </div>
+        )}
+        {finalizeSuccess && (
+          <div className="card mb-4 bg-green-900/20 border-2 border-green-700/50">
+            <p className="text-green-400 font-bold text-lg">Ownership verified!</p>
+            <p className="text-green-300 text-sm mt-1">Refreshing page...</p>
+          </div>
+        )}
+
+        {/* Identity Banner */}
+        {needsIdentity && !finalizeToken && (
+          <div className="mb-4 p-4 bg-cyan-900/20 border border-cyan-700/50 rounded-lg">
+            <p className="text-cyan-400 font-semibold mb-1">Complete Your Ownership</p>
+            <p className="text-cyan-300 text-sm mb-3">
+              Verify your identity to unlock full management access, get your custodial wallet, and manage this animal from your Ranch Dashboard.
+            </p>
+            <button onClick={() => setShowLoginModal(true)}
+              className="px-4 py-2 rounded-lg bg-[var(--c2)] text-white text-sm font-medium hover:opacity-90">
+              Verify Identity
+            </button>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-4">
 
@@ -402,24 +598,18 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
 
         {/* Actions */}
         <div className="flex gap-3 mt-4 flex-wrap">
-          {(isOwner || isSuperadminView) ? (
-            <>
-              <button
-                onClick={() => setShowUpdateForm(!showUpdateForm)}
-                className="btn-primary"
-              >
-                {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
-              </button>
-              {isSuperadminView && (
-                <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-700/30 rounded-lg px-3 py-2">
-                  🛡️ Superadmin edit mode
-                </span>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-[var(--c4)] bg-white/5 border border-white/10 rounded-lg px-3 py-2">
-              <span>🔒</span>
-              <span>Updates are restricted to the tag owner</span>
+          <button onClick={handleEditClick} className="btn-primary">
+            {showUpdateForm ? '✕ Cancel' : '📝 Update Animal'}
+          </button>
+          {isSuperadminView && (
+            <span className="flex items-center gap-1 text-xs text-yellow-400 bg-yellow-900/20 border border-yellow-700/30 rounded-lg px-3 py-2">
+              🛡️ Superadmin edit mode
+            </span>
+          )}
+          {actionError && (
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-900/20 border border-red-700/30 rounded-lg px-3 py-2">
+              <span>⚠️</span>
+              <span>{actionError}</span>
             </div>
           )}
           <button onClick={() => router.push('/dashboard')} className="btn-secondary">
@@ -427,8 +617,8 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
           </button>
         </div>
 
-        {/* Ongoing Update Form — owner or superadmin */}
-        {(isOwner || isSuperadminView) && showUpdateForm && (
+        {/* Ongoing Update Form */}
+        {showUpdateForm && (
           <div className="mt-4 card border-2 border-[var(--c2)]/40 bg-gradient-to-br from-blue-900/10 to-purple-900/10">
             <h3 className="text-xl font-bold mb-4">📝 Log Update</h3>
             <form onSubmit={handleUpdate} className="space-y-4">
@@ -559,6 +749,53 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
             </button>
           </div>
         </div>
+        {/* Login Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-[var(--bg-card)] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold">Sign In</h3>
+                <button onClick={() => { setShowLoginModal(false); setLoginStep('email'); setLoginError(null) }}
+                  className="text-[var(--c4)] hover:text-white text-xl">✕</button>
+              </div>
+              {loginStep === 'email' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-[var(--c4)]">Email</label>
+                    <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none" />
+                  </div>
+                  {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+                  <button onClick={handleSendCode} disabled={loginLoading || !loginEmail}
+                    className="btn-primary w-full">
+                    {loginLoading ? 'Sending...' : 'Send Code'}
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-[var(--c4)]">Code sent to <span className="text-white font-medium">{loginEmail}</span></p>
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-[var(--c4)]">Verification Code</label>
+                    <input type="text" inputMode="numeric" maxLength={6} value={loginCode}
+                      onChange={e => setLoginCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      className="w-full px-4 py-3 bg-[var(--bg)] border-2 border-[#1F2937] rounded-lg focus:border-[var(--c2)] focus:outline-none text-center text-2xl tracking-[0.3em] font-mono" />
+                  </div>
+                  {loginError && <p className="text-red-400 text-sm">{loginError}</p>}
+                  <button onClick={handleVerifyCode} disabled={loginLoading || loginCode.length !== 6}
+                    className="btn-primary w-full">
+                    {loginLoading ? 'Verifying...' : 'Verify'}
+                  </button>
+                  <button onClick={() => { setLoginStep('email'); setLoginCode(''); setLoginError(null) }}
+                    className="text-sm text-[var(--c4)] hover:text-white w-full text-center">
+                    ← Back to email
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

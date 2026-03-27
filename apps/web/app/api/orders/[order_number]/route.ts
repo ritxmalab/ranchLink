@@ -24,6 +24,12 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
+    // Redact sensitive PII — only show what the customer needs for tracking
+    const email = data.customer_email ?? null
+    const maskedEmail = email
+      ? email.replace(/^(.{2})(.*)(@.*)$/, (_, a, b, c) => a + b.replace(/./g, '*') + c)
+      : null
+
     return NextResponse.json({
       order: {
         order_number: data.order_number || data.stripe_checkout_session_id,
@@ -34,10 +40,8 @@ export async function GET(
         currency: data.currency ?? null,
         tier: data.tier ?? null,
         tag_count: data.tag_count ?? 0,
-        customer_email: data.customer_email ?? null,
+        customer_email: maskedEmail,
         shipping_name: data.shipping_name ?? null,
-        shipping_phone: data.shipping_phone ?? null,
-        shipping_address_json: data.shipping_address_json ?? null,
         carrier: data.carrier ?? null,
         tracking_number: data.tracking_number ?? null,
         tracking_url: data.tracking_url ?? null,
