@@ -176,19 +176,18 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 8. Insert all tags into Supabase ────────────────────────────────────────
+  const { randomUUID } = await import('crypto')
   const tagRows = tagCodes.map((tagCode) => ({
     tag_code: tagCode,
     chain: chain || 'BASE',
     contract_address: contractAddress,
-    token_id: null,           // Set at lazy mint (claim time)
-    mint_tx_hash: null,       // Set at lazy mint (claim time)
+    token_id: null,
+    mint_tx_hash: null,
     batch_id: batch.id,
     ranch_id: targetRanchId || null,
-    status: 'pre_identity',   // Anchored on-chain, NFT mints at claim time
+    status: 'pre_identity',
     activation_state: 'active',
-    // Merkle proof stored in mint_tx_hash as JSON string (no metadata column needed)
-    // Format: "PROOF:<batchIdHex>|<proof1>,<proof2>,..."
-    // This is decoded at attach time to reconstruct the proof
+    claim_secret: randomUUID(),
     metadata_cid: `MERKLE:${batchId}|${(proofs[tagCode] || []).join(',')}`,
   }))
 
@@ -235,10 +234,11 @@ export async function POST(request: NextRequest) {
     id: tag.id,
     tag_code: tag.tag_code,
     public_id: null,
-    token_id: null,           // Assigned at claim time
+    token_id: null,
     mint_tx_hash: null,
     anchor_tx_hash: anchorTxHash,
     base_qr_url: `${appUrl}/t/${tag.tag_code}`,
+    claim_url: tag.claim_secret ? `${appUrl}/t/${tag.tag_code}?s=${tag.claim_secret}` : `${appUrl}/t/${tag.tag_code}`,
     chain: chain || 'BASE',
     contract_address: contractAddress,
     status: 'pre_identity',

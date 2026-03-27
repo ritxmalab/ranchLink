@@ -2,6 +2,13 @@ const TIER_TAG_COUNT: Record<string, number> = {
   single: 1,
   five_pack: 5,
   stack: 10,
+  label_100: 100,
+  tpp_1: 1,
+  tpp_5: 5,
+  tpp_15: 15,
+  orange_3: 3,
+  yellow_abs_3: 3,
+  fluoro_3: 3,
 }
 
 export function getTierTagCount(tier: string | null | undefined): number {

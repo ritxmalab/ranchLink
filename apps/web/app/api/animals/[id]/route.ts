@@ -24,7 +24,8 @@ export async function GET(
           chain,
           contract_address,
           status,
-          activation_state
+          activation_state,
+          owner_user_id
         ),
         ranches (
           id,

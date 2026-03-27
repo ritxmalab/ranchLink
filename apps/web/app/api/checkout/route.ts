@@ -14,6 +14,13 @@ const PRICE_MAP: Record<string, string | undefined> = {
   single: process.env.STRIPE_PRICE_SINGLE,
   five_pack: process.env.STRIPE_PRICE_FIVE_PACK,
   stack: process.env.STRIPE_PRICE_STACK,
+  label_100: process.env.STRIPE_PRICE_LABEL_100,
+  tpp_1: process.env.STRIPE_PRICE_TPP_1,
+  tpp_5: process.env.STRIPE_PRICE_TPP_5,
+  tpp_15: process.env.STRIPE_PRICE_TPP_15,
+  orange_3: process.env.STRIPE_PRICE_ORANGE_3,
+  yellow_abs_3: process.env.STRIPE_PRICE_YELLOW_ABS_3,
+  fluoro_3: process.env.STRIPE_PRICE_FLUORO_3,
 }
 
 type TierKey = keyof typeof PRICE_MAP

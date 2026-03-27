@@ -54,8 +54,21 @@ export default function TagScanPage({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null)
   const [attaching, setAttaching] = useState(false)
   const [attachSuccess, setAttachSuccess] = useState(false)
-  const [mintingStep, setMintingStep] = useState(0) // 0=idle, 1=saving, 2=ipfs, 3=blockchain, 4=done, -1=error
+  const [mintingStep, setMintingStep] = useState(0)
   const [mintingError, setMintingError] = useState<{ message: string; code: string; step: string } | null>(null)
+
+  // ── Identity verification state ─────────────────────────────────────────
+  const [claimStep, setClaimStep] = useState<'identity' | 'otp' | 'form'>('identity')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [claimantName, setClaimantName] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [sendingCode, setSendingCode] = useState(false)
+  const [verifyingCode, setVerifyingCode] = useState(false)
+  const [verifiedRanchId, setVerifiedRanchId] = useState<string | null>(null)
+  const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [showExistingUserModal, setShowExistingUserModal] = useState(false)
+  const [existingRanchName, setExistingRanchName] = useState<string | null>(null)
 
   // ── Inline QR camera scanner ──────────────────────────────────────────────
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -73,7 +86,7 @@ export default function TagScanPage({ params }: PageProps) {
   }, [])
 
   const openScanner = useCallback(async () => {
-    stopScanner() // always clean up any previous stream before opening a new one
+    stopScanner()
     setScannerOpen(true)
     setScanStatus('requesting')
     setScanError('')
@@ -103,7 +116,6 @@ export default function TagScanPage({ params }: PageProps) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' })
         if (code?.data) {
-          // Accept full URL, plain tag code, or token code (RL-029-XXXXXXXX)
           const urlMatch = code.data.match(/\/t\/(RL-\d+)/i)
           const tokenMatch = code.data.match(/^(RL-\d+)(?:-|$)/i)
           const tagCode = urlMatch?.[1] || tokenMatch?.[1]
@@ -185,8 +197,6 @@ export default function TagScanPage({ params }: PageProps) {
       }
       const data = await response.json()
 
-      // Redirect to animal card if already attached
-      // Use tag.public_id first (most reliable), fall back to animals join
       const attachedPublicId = data.tag?.public_id || data.tag?.animals?.public_id
       if (data.tag?.animal_id && attachedPublicId) {
         router.push(`/a/${attachedPublicId}`)
@@ -206,6 +216,116 @@ export default function TagScanPage({ params }: PageProps) {
     fetchTag()
   }, [fetchTag])
 
+  // ── Check for existing session → skip identity step ───────────────────────
+  useEffect(() => {
+    fetch('/api/auth/session', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.authenticated && data.ranch_id) {
+          setVerifiedRanchId(data.ranch_id)
+          setEmail(data.email || '')
+          setWalletAddress(data.wallet_address || null)
+          setClaimStep('form')
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // ── Actually send the verification code (shared by initial + resend) ──────
+  const doSendCode = useCallback(async () => {
+    setSendingCode(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone: phone || undefined, purpose: 'claim' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send code')
+      setClaimStep('otp')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSendingCode(false)
+    }
+  }, [email, phone])
+
+  // ── Identity verification handlers ─────────────────────────────────────────
+  const handleSendCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSendingCode(true)
+    setError(null)
+    try {
+      const checkRes = await fetch('/api/auth/check-existing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone: phone || undefined }),
+      })
+      const checkData = await checkRes.json()
+      if (checkData.exists) {
+        setExistingRanchName(checkData.ranch_name || 'your ranch')
+        setShowExistingUserModal(true)
+        setSendingCode(false)
+        return
+      }
+    } catch {
+      // If check fails, proceed to send code anyway
+    }
+    setSendingCode(false)
+    await doSendCode()
+  }
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setVerifyingCode(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          code: otpCode,
+          phone: phone || undefined,
+          name: claimantName || undefined,
+          purpose: 'claim',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Invalid code')
+      setVerifiedRanchId(data.ranch_id)
+      setWalletAddress(data.wallet_address || null)
+      setClaimStep('form')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setVerifyingCode(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    setSendingCode(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, phone: phone || undefined, purpose: 'claim' }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to resend')
+      }
+      setOtpCode('')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
   const handleAttach = async (e: React.FormEvent) => {
     e.preventDefault()
     setAttaching(true)
@@ -213,7 +333,6 @@ export default function TagScanPage({ params }: PageProps) {
     setError(null)
 
     try {
-      // Step 1: Upload photo if provided
       let photoUrl: string | undefined
       if (photoFile) {
         setPhotoUploading(true)
@@ -233,7 +352,7 @@ export default function TagScanPage({ params }: PageProps) {
         setPhotoUploading(false)
       }
 
-      setMintingStep(2) // Pinning to IPFS
+      setMintingStep(2)
       const response = await fetch('/api/attach-tag', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,14 +381,13 @@ export default function TagScanPage({ params }: PageProps) {
         }),
       })
 
-      setMintingStep(3) // Minting on blockchain
+      setMintingStep(3)
 
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to attach tag')
-      setMintingStep(4) // Done
+      setMintingStep(4)
       setAttachSuccess(true)
 
-      // Give the user 3 seconds to see the success screen before redirecting
       setTimeout(() => {
         router.push(`/a/${data.public_id}`)
       }, 3000)
@@ -278,7 +396,6 @@ export default function TagScanPage({ params }: PageProps) {
       const stepNames = ['', 'Saving data', 'Pinning to IPFS', 'Blockchain mint', 'Finalizing']
       const failedAt = mintingStep > 0 ? stepNames[mintingStep] || 'Processing' : 'Processing'
       const rawMsg: string = err.message || 'Unknown error'
-      // Extract a short error code from the message for display
       const code = rawMsg.includes('MINTER') ? 'ERR_MINTER_ROLE'
         : rawMsg.includes('balance') || rawMsg.includes('funds') ? 'ERR_INSUFFICIENT_FUNDS'
         : rawMsg.includes('network') || rawMsg.includes('fetch') ? 'ERR_NETWORK'
@@ -311,7 +428,7 @@ export default function TagScanPage({ params }: PageProps) {
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg)]">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Tag Not Found</h1>
-          <p className="text-[var(--c4)] mb-8">Tag code "{tag_code}" does not exist.</p>
+          <p className="text-[var(--c4)] mb-8">Tag code &ldquo;{tag_code}&rdquo; does not exist.</p>
           <a href="/" className="btn-primary">Go Home</a>
         </div>
       </div>
@@ -422,7 +539,6 @@ export default function TagScanPage({ params }: PageProps) {
                 </button>
                 <button
                   onClick={() => {
-                    // Copy error code to clipboard
                     navigator.clipboard?.writeText(`${mintingError?.code}: ${mintingError?.message}`)
                       .then(() => alert('Error copied to clipboard'))
                       .catch(() => {})
@@ -499,7 +615,6 @@ export default function TagScanPage({ params }: PageProps) {
   }
 
   const basescanUrl = tag.token_id ? getBasescanUrl(BigInt(tag.token_id)) : null
-  // pre_identity = Merkle-anchored ERC-1155 tag — valid for attachment (lazy mints at claim)
   const onChainStatus: 'on-chain' | 'anchored' | 'off-chain' =
     tag.token_id && tag.contract_address ? 'on-chain'
     : tag.status === 'pre_identity' ? 'anchored'
@@ -557,6 +672,32 @@ export default function TagScanPage({ params }: PageProps) {
         </div>
       )}
 
+      {/* ── Welcome Back modal ── */}
+      {showExistingUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--c2)]/50 p-6 max-w-sm w-full">
+            <h3 className="text-xl font-bold mb-2">Welcome Back!</h3>
+            <p className="text-[var(--c4)] text-sm mb-4">
+              We found an existing RanchLink account under <span className="text-[var(--c2)] font-semibold">{existingRanchName}</span>. Is this you?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowExistingUserModal(false); doSendCode() }}
+                className="flex-1 py-3 rounded-lg bg-[var(--c2)] text-white font-semibold"
+              >
+                Yes, that&apos;s me
+              </button>
+              <button
+                onClick={() => { setShowExistingUserModal(false); doSendCode() }}
+                className="flex-1 py-3 rounded-lg border border-[#1F2937] text-[var(--c4)]"
+              >
+                No, new account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto">
 
         {/* Tag Info Card */}
@@ -607,8 +748,90 @@ export default function TagScanPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Attach Form */}
-        {!tag.animal_id && (
+        {/* ── Identity Verification Step ── */}
+        {claimStep === 'identity' && !tag.animal_id && (
+          <div className="card bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border-2 border-cyan-700/50 mb-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold mb-1">Verify Your Identity</h2>
+              <p className="text-sm text-[var(--c4)]">
+                Before claiming this tag, we need to verify your identity. This connects the tag to your ranch account.
+              </p>
+            </div>
+
+            <form onSubmit={handleSendCode} className="space-y-4">
+              <div>
+                <label className={labelClass}>Email Address *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com" className={inputClass} required />
+              </div>
+              <div>
+                <label className={labelClass}>Phone Number *</label>
+                <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+1 (555) 000-0000" className={inputClass} required />
+              </div>
+              <div>
+                <label className={labelClass}>Your Name</label>
+                <input type="text" value={claimantName} onChange={(e) => setClaimantName(e.target.value)}
+                  placeholder="John Smith" className={inputClass} />
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
+              <button type="submit" className="btn-primary w-full" disabled={sendingCode || !email || !phone}>
+                {sendingCode ? 'Sending code...' : 'Send Verification Code'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ── OTP Verification Step ── */}
+        {claimStep === 'otp' && !tag.animal_id && (
+          <div className="card bg-gradient-to-br from-cyan-900/20 to-blue-900/20 border-2 border-cyan-700/50 mb-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold mb-1">Enter Verification Code</h2>
+              <p className="text-sm text-[var(--c4)]">
+                We sent a 6-digit code to <span className="text-[var(--c2)] font-medium">{email}</span>
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyCode} className="space-y-4">
+              <div>
+                <label className={labelClass}>Verification Code</label>
+                <input type="text" value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000" className={`${inputClass} text-center text-2xl tracking-[0.5em] font-mono`}
+                  maxLength={6} required autoFocus />
+              </div>
+
+              {error && (
+                <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
+              <button type="submit" className="btn-primary w-full" disabled={verifyingCode || otpCode.length !== 6}>
+                {verifyingCode ? 'Verifying...' : 'Verify & Continue'}
+              </button>
+
+              <div className="flex justify-between text-sm">
+                <button type="button" onClick={() => { setClaimStep('identity'); setOtpCode(''); setError(null) }}
+                  className="text-[var(--c4)] hover:text-[var(--c2)]">
+                  ← Back
+                </button>
+                <button type="button" onClick={handleResendCode} disabled={sendingCode}
+                  className="text-[var(--c4)] hover:text-[var(--c2)]">
+                  {sendingCode ? 'Sending...' : 'Resend code'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Attach Form — only when verified */}
+        {claimStep === 'form' && !tag.animal_id && (
           <div className="card bg-gradient-to-br from-blue-900/20 to-purple-900/20 border-2 border-blue-700/50">
             <div className="mb-4">
               <h2 className="text-2xl font-bold mb-1">Attach Tag to Animal</h2>
@@ -635,8 +858,6 @@ export default function TagScanPage({ params }: PageProps) {
                 </p>
               </div>
             )}
-
-            {/* Success state is handled by the full-screen minting overlay above */}
 
             {error && (
               <div className="mb-4 p-4 bg-red-900/20 border border-red-700/50 rounded-lg">
@@ -690,6 +911,7 @@ export default function TagScanPage({ params }: PageProps) {
                     <option value="Goat">Goat</option>
                     <option value="Pig">Pig</option>
                     <option value="Horse">Horse</option>
+                    <option value="Exotic/Safari">Exotic/Safari</option>
                     <option value="Other">Other</option>
                   </select>
                 </div>
@@ -859,7 +1081,6 @@ export default function TagScanPage({ params }: PageProps) {
                   type="submit"
                   className="btn-primary flex-1"
                   disabled={attaching || !animalName || !species || onChainStatus === 'off-chain'}
-                  // anchored and on-chain are both valid — only off-chain blocks submission
                 >
                   {attaching ? '⛓️ Processing...' : '🐄 Attach Animal'}
                 </button>

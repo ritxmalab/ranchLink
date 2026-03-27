@@ -15,7 +15,7 @@ export type ProductCardProps = {
   imgBg?: string
   isContact?: boolean
   /** For Stripe checkout; null = use Contact or mailto Buy */
-  stripeTierKey?: 'single' | 'five_pack' | 'stack' | null
+  stripeTierKey?: string | null
   selected?: boolean
   onSelect?: () => void
   buyingTierId?: string | null
@@ -121,7 +121,7 @@ export default function ProductCard({
         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           {isContact ? (
             <a
-              href="mailto:hello@ritxma.com?subject=RanchLink%20Custom%20Order"
+              href="mailto:solve@ritxma.com?subject=RanchLink%20Custom%20Order"
               className="flex-1 py-2 px-3 text-sm font-medium rounded-lg bg-[var(--c2)] text-white hover:opacity-90 transition-opacity text-center"
             >
               Contact Us
@@ -146,7 +146,7 @@ export default function ProductCard({
                 </button>
               ) : (
                 <a
-                  href={`mailto:hello@ritxma.com?subject=RanchLink%20Order&body=Product:%20${encodeURIComponent(title + (nameCode ? ` (${nameCode})` : ''))}`}
+                  href={`mailto:solve@ritxma.com?subject=RanchLink%20Order&body=Product:%20${encodeURIComponent(title + (nameCode ? ` (${nameCode})` : ''))}`}
                   className="py-2 px-3 text-sm font-medium rounded-lg border border-[var(--c2)] text-[var(--c2)] hover:bg-[var(--c2)]/10 transition-colors text-center"
                 >
                   Buy
