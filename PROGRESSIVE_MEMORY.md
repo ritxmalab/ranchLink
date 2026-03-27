@@ -420,20 +420,106 @@ Before writing any code, confirm these in order:
 | `apps/web/lib/orders.ts` | **MODIFIED** — expanded tier counts |
 | `apps/web/.env.local.example` | **MODIFIED** — new Stripe price env vars |
 
-### Deploy checklist
-1. **Run SQL migration** `007_RANCH_USERS_AUTH_RLS.sql` in Supabase SQL Editor
-2. **Set env vars on Vercel**:
-   - `ORDER_EMAIL_FROM=RanchLink <solve@ritxma.com>` (for Resend)
-   - `RESEND_API_KEY=re_...` (must be configured for auth emails)
-   - `STRIPE_PRICE_LABEL_100`, `STRIPE_PRICE_TPP_1`, etc. — create prices in Stripe Dashboard
-3. **Push + deploy** to Vercel
-4. **Test flows**: purchase → order email → order tracking → superadmin orders → fulfillment
-5. **Test flows**: scan QR → identity → PIN → claim → ranch dashboard → events
+### Files created/modified (FINAL — Session 7b, 2026-03-27)
+| File | Action |
+|------|--------|
+| `apps/web/app/api/auth/check-existing/route.ts` | **NEW** — detect returning users by email/phone |
+| `apps/web/app/api/auth/finalize-claim/route.ts` | **NEW** — retroactive identity for already-claimed tags |
+| `apps/web/app/api/ranch/profile/route.ts` | **NEW** — GET/PATCH ranch + user profile + stats |
+| `apps/web/app/api/ranch/export/route.ts` | **NEW** — export all ranch data as JSON |
+| `apps/web/app/api/superadmin/finalize-links/route.ts` | **NEW** — generate finalize-claim URLs for unverified owners |
+| `apps/web/app/a/[public_id]/page.tsx` | **MODIFIED** — update protection (login required), identity banner, finalize-claim URL support, login modal |
+| `apps/web/app/api/superadmin/orders/route.ts` | **MODIFIED** — fulfillment email notifications (packed/shipped/delivered via Resend) |
 
-### What remains (next session)
-- Custodial wallet creation per ranch (CDP integration)
-- SMS verification via Twilio (currently email-only)
-- Claim_secret validation enforcement (currently claim works without `?s=` for backward compat)
-- NFT transfer to farmer's custodial wallet
-- CRM / marketing integrations
-- Legal / compliance documentation
+### Session 7b — Additional changes (2026-03-27)
+- **Wallet generation**: EOA wallets via viem (NOT CDP smart wallets — avoids the drain risk). AES-256-GCM encrypted private keys. One wallet per ranch, generated at identity verification. Stored in `ranch_wallets` table.
+- **Returning user detection**: `POST /api/auth/check-existing` checks email + phone. Claim flow shows "Welcome back" modal when account already exists.
+- **Animal card update protection**: Edit button on `/a/[public_id]` now requires login. Session-based auth matching ranch_id. SuperAdmin bypasses. Wrong ranch → error message.
+- **Retroactive identity banner**: Tags without `owner_user_id` show a cyan banner prompting "Complete Your Ownership" → login modal.
+- **Finalize-claim links**: SuperAdmin can generate signed URLs (`GET /api/superadmin/finalize-links`) for existing unverified owners. URLs valid 30 days.
+- **Fulfillment notifications**: When SuperAdmin updates order status to packed/shipped/delivered, customer gets an email via Resend with tracking info.
+- **Ranch dashboard expanded**: 5 tabs (Overview, Herd, Health, Analytics, Settings). Genetics/lineage, financial/cost tracking, event evidence uploads, wallet info, data export.
+- **Transfer requests table**: `transfer_requests` in DB for future wallet conversion / RWA transfer fee tracking.
+- **Species expanded**: Exotic/Safari added to claim form species dropdown.
+
+---
+
+## 17. Current Status (2026-03-27)
+
+### Committed & Pushed
+- **Branch**: `session7-full-platform` merged to `main`
+- **Commit**: `4778c94` → pushed to `origin/main`
+- **Vercel**: Auto-deploying from push (check Vercel dashboard for build status)
+
+### BLOCKING — Must Complete Before Features Work
+
+| # | Task | Who | Status |
+|---|------|-----|--------|
+| 1 | **Run SQL migration** `007_RANCH_USERS_AUTH_RLS.sql` in Supabase SQL Editor | Gonzalo | **NOT DONE** — all auth/wallet/events features blocked until this runs |
+| 2 | **Set `WALLET_ENCRYPTION_KEY`** on Vercel env vars (32+ char random string) | Gonzalo | **NOT DONE** — wallet generation will fail without this |
+| 3 | **Set `ORDER_EMAIL_FROM`** on Vercel: `RanchLink <solve@ritxma.com>` | Gonzalo | **NOT DONE** — verification + order emails need this |
+| 4 | **Verify `RESEND_API_KEY`** is set on Vercel | Gonzalo | Check — email sending depends on this |
+| 5 | **Check Vercel build** succeeded (no TS errors) | Gonzalo | Check Vercel dashboard |
+
+### After Migration Runs — Test Flow
+1. Go to `ranch-link.vercel.app/ranch` → enter `gonzalobame@gmail.com` → receive PIN → sign in → ranch + wallet auto-created
+2. Scan any tag QR → must see identity verification before animal form
+3. Try editing `/a/AUS0008` → should require login
+4. As SuperAdmin: `GET /api/superadmin/finalize-links` → get URLs for 3 existing owners
+5. Update an order status in SuperAdmin → customer should get email
+
+### Stripe Products Not Yet Created
+These products are wired in code but need Stripe Price IDs created in Stripe Dashboard and set on Vercel:
+- `STRIPE_PRICE_LABEL_100` (RanchLink Label $9.99)
+- `STRIPE_PRICE_TPP_1` (Translucid PETG $1.99)
+- `STRIPE_PRICE_TPP_5` (Translucid PETG 5-Pack $6.99)
+- `STRIPE_PRICE_TPP_15` (Translucid PETG 15-Pack $31.89)
+- `STRIPE_PRICE_ORANGE_3` (Orange 3-Pack $3.33)
+- `STRIPE_PRICE_YELLOW_ABS_3` (Yellow ABS 3-Pack $3.99)
+- `STRIPE_PRICE_FLUORO_3` (Fluorescent PETG 3-Pack $3.99)
+
+Until created, these products will fall through to `mailto:solve@ritxma.com` (graceful fallback).
+
+### What's Built & Ready (once migration + env vars are set)
+- [x] Identity-gated claim flow (email + phone + PIN)
+- [x] Returning user detection ("Welcome back" / "Already have account?")
+- [x] EOA custodial wallet per ranch (no CDP drain risk)
+- [x] Ranch Admin Dashboard (/ranch) — 5 tabs, full management
+- [x] Animal card update protection (login required)
+- [x] Retroactive identity for existing owners (finalize-claim links)
+- [x] All 10 products wired to Stripe
+- [x] Fulfillment email notifications (packed/shipped/delivered)
+- [x] RLS on all 11 Supabase tables
+- [x] Security headers (XSS, clickjack, referrer, permissions)
+- [x] PII redaction on public order API
+- [x] claim_secret per tag in factory batches
+- [x] Data export for interoperability
+- [x] Email: solve@ritxma.com everywhere
+
+### What Remains (future sessions)
+- [ ] SMS verification (needs Twilio or alternative provider — email-only for now)
+- [ ] Enforce `claim_secret` validation on `/t/[tag_code]` (currently backward-compatible — allows claims without `?s=`)
+- [ ] NFT transfer to farmer's custodial wallet on claim
+- [ ] Marketplace (buy/sell RWAs between ranchers)
+- [ ] Non-custodial wallet conversion flow (with fee)
+- [ ] RWA transfer to external wallets (with fee)
+- [ ] Custom batch ordering from within Ranch Admin
+- [ ] Import data from other platforms (CSV/API)
+- [ ] CRM / marketing integrations
+- [ ] Legal / compliance documentation
+- [ ] Sentry error monitoring setup
+
+### User Types (confirmed architecture)
+| Role | Access | Login |
+|------|--------|-------|
+| **SuperAdmin** (Gonzalo + AI) | Factory, IT, orders, fulfillment, all tags, all animals, finalize-links, mini-rancher view | `/superadmin` with SUPERADMIN_PASSWORD |
+| **Rancher (Admin)** | Their ranch only: animals, events, health, genetics, costs, analytics, wallet, export | `/ranch` with email + PIN (e.g. gonzalobame@gmail.com) |
+| **Public** | View animal cards (`/a/[public_id]`), browse store, order tracking | No login needed |
+
+### Revenue Model (architecture supports)
+- Tag sales on store → subscription gateway
+- Label batch sales
+- Custom batch purchases (future: from admin)
+- RWA marketplace (future: sell animals)
+- Non-custodial wallet conversion (future: fee-based)
+- Asset transfer to external wallet (future: fee-based)
