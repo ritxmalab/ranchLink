@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-02 (session 5 — batch fix, production batches, third-party claim) | **Build:** f7487d5 | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-27 (session 7 — fulfillment pipeline polish, Stripe ship-to fix) | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -27,6 +27,8 @@ RanchLink is a blockchain-linked cattle tag system. Physical 3D-printed tags (PE
 | Dashboard | https://ranch-link.vercel.app/dashboard |
 | Superadmin | https://ranch-link.vercel.app/superadmin |
 | Marketplace | https://ranch-link.vercel.app/marketplace |
+| Ranch portal | https://ranch-link.vercel.app/ranch |
+| Order tracking | https://ranch-link.vercel.app/order/[order_number]?k=[secret] |
 
 ---
 
@@ -89,7 +91,7 @@ Factory (batch generation)
 - `apps/web/app/t/[tag_code]/page.tsx` — Tag claim flow with inline scanner
 - `apps/web/app/a/[public_id]/page.tsx` — Public animal card (owner-only updates)
 - `apps/web/app/dashboard/page.tsx` — Ranch dashboard with animal cards + photos
-- `apps/web/app/superadmin/page.tsx` — Factory/Assemble/Dashboard/Inventory tabs
+- `apps/web/app/superadmin/page.tsx` — Factory/Assemble/Dashboard/Inventory/**Orders** tabs (internal fulfillment: ship-to, notes, assigned, Stripe link)
 
 ### API Routes
 - `apps/web/app/api/factory/batches/route.ts` — Generate batch (anchorBatch on-chain)
@@ -118,15 +120,36 @@ Factory (batch generation)
 
 ## 5. Authentication
 
-### Superadmin
-- Cookie: `rl_superadmin=<value>` — set by `/api/superadmin/login`, `httpOnly: false` (readable by JS)
+### Superadmin (factory ops)
+- Cookie: `rl_superadmin=<value>` — set by `/api/superadmin/login`, `httpOnly: true`
 - All superadmin API calls require `credentials: 'include'`
 - Superadmin can edit any animal via `/a/[public_id]?superadmin=1`
 
-### Tag Ownership (Farmer)
-- Cookie: `rl_owner_<public_id>=<claim_token>` — set at attach time, `httpOnly: false`
-- `claim_token` stored in `tags.claim_token` (UUID) — **PENDING MIGRATION** (see §8)
-- Until migration runs, ownership check is permissive (allows updates when column is null)
+### Tag Ownership (Farmer) — `rl_owner_*`
+- Cookie: `rl_owner_<public_id>=<claim_token>` — set at attach time, **`httpOnly: true`** (session 6)
+- `claim_token` stored in `tags.claim_token` (UUID)
+- `/api/update-animal` reads the cookie server-side; no client JS access needed
+- `/api/animals/[id]` returns `viewer: 'owner' | 'public' | 'superadmin'` and `can_edit` flag
+
+### Claim PIN Gate (session 6)
+- **Flow:** `/t/[tag_code]` → email+phone → 6-digit PIN to email (Resend) → verify → `rl_claim_gate` httpOnly cookie → `attach-tag` validates gate before allowing claim
+- **APIs:** `/api/claim/request-pin`, `/api/claim/verify-pin`, `/api/claim/gate-status`
+- **Lib:** `lib/claim-gate.ts` — HMAC-signed token with tag_code + email + phone + expiry
+- **Bypass:** superadmin cookie OR `CLAIM_VERIFICATION_DISABLED=1` (non-production only)
+- After attach: gate cookie cleared, `rl_rancher_portal` 90-day cookie set
+
+### Rancher Portal (session 6)
+- Cookie: `rl_rancher_portal=<signed-token>` — ranch_id + email, 90-day TTL, httpOnly
+- **Page:** `/ranch` — herd overview, links to animal cards
+- **APIs:** `/api/ranch/session`, `/api/ranch/animals`, `/api/ranch/logout`
+- **Lib:** `lib/rancher-portal-auth.ts`
+- This is **not** the Superadmin factory console; it is the farmer/rancher private dashboard
+
+### Animal Privacy (session 6)
+- **Public** viewers see: name, species, breed, photo, basic stats, chain/tag proof, ranch name only
+- **Owner/Superadmin** see: full record including EID, tattoo, purchase, notes, ranch contact
+- Event notes omitted on public view
+- `lib/animal-privacy.ts` — `toPublicAnimalCard()`, `toPublicEvents()`
 
 ---
 
@@ -173,6 +196,9 @@ This enables the farmer ownership system. Migration has been run; attach-tag now
 
 | # | File | Bug | Fix |
 |---|------|-----|-----|
+| — | api/stripe/webhook | Ship-to missing / wrong (only billing address saved) | Prefer `session.shipping_details` over `customer_details` for name/phone/address |
+| — | superadmin/page.tsx | Ops had to click “Load order metrics”; easy to miss new sales | `useEffect` auto-`fetchOrders()` when Orders tab + authed |
+| — | api/stripe/webhook | Customer confirmation skipped if `ORDER_EMAIL_FROM` unset | Fallback `from` same pattern as internal emails |
 | H15 | scan/page.tsx | Scanner froze on non-RanchLink QR | Only stop loop when handleFound() returns true |
 | H5 | t/[tag_code]/page.tsx | Photo upload failure silent | Show error, abort form |
 | H23 | api/update-animal | photo_url stripped by Zod | Added to schema |
@@ -225,7 +251,18 @@ Key vars (never commit values):
 - `RANCHLINKTAG_1155_ADDRESS` — ERC-1155 contract address
 - `PINATA_JWT` — Pinata IPFS JWT
 - `SUPERADMIN_PASSWORD` — Superadmin login password
+- `SUPERADMIN_SESSION_SECRET` — ≥32 char secret for signed session cookies
+- `RANCHLINK_PORTAL_SECRET` — ≥16 char secret for claim gate + rancher portal cookies (falls back to SUPERADMIN_SESSION_SECRET)
 - `NEXT_PUBLIC_APP_URL` — https://ranch-link.vercel.app
+- `NEXT_PUBLIC_BASE_URL` — same as above (used by Stripe redirects)
+- `STRIPE_SECRET_KEY` — Stripe secret API key
+- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signing secret
+- `STRIPE_PRICE_SINGLE` / `STRIPE_PRICE_FIVE_PACK` / `STRIPE_PRICE_STACK` — Stripe price IDs
+- `RESEND_API_KEY` — Resend email API key
+- `ORDER_EMAIL_FROM` — e.g. `RanchLink <solve@ranchlink.com>`
+- `CLAIM_EMAIL_FROM` — e.g. `RanchLink <solve@ranchlink.com>` (defaults to ORDER_EMAIL_FROM)
+- `INTERNAL_OPS_EMAILS` — comma-separated, e.g. `solve@ranchlink.com,gonzalo@ritxma.com`
+- `CLAIM_VERIFICATION_DISABLED` — set to `1` in dev to skip PIN (never in production)
 
 ---
 
@@ -237,87 +274,89 @@ Key vars (never commit values):
 
 ---
 
-## 13. Open Issues (Not Yet Fixed)
+## 13. Session 6 — Commerce Pipeline, Claim PIN, Security (2026-03-25)
+
+### Commerce / fulfillment
+- **Superadmin orders API** returns **full** shipping, contact, tracking, `internal_notes`, `assigned_to` (migration `008_ORDER_INTERNAL_FIELDS.sql`)
+- **Superadmin orders UI** — expandable `<details>` per order; **auto-loads** when the Orders tab opens (no manual “Load metrics”); **Stripe Dashboard** search link + session id; status dropdown includes **pending payment**; **Assigned** field; Save posts notes + assignment + fulfillment
+- **Stripe webhook ship-to fix (2026-03-27):** persist **`session.shipping_details`** (name, phone, address) when present — **not** only `customer_details` (billing). Without this, physical ship-to was often wrong or empty.
+- **Customer confirmation email:** `ORDER_EMAIL_FROM` may fall back to `CLAIM_EMAIL_FROM` or `RanchLink <solve@ranchlink.com>` if the primary var is unset (still requires `RESEND_API_KEY` + verified sender domain in Resend)
+- **Internal ops email**: on paid checkout events, `sendInternalOpsNotification` → `INTERNAL_OPS_EMAILS` (default solve@ranchlink.com, gonzalo@ritxma.com) with order summary + ship-to
+- **Customer shipped email**: Superadmin sets **Shipped** → prompts carrier/tracking → optional “Send email to customer?”
+- **Order view secret**: `order_view_secret` on `stripe_orders` — `/order/[n]` summary vs full detail with `?k=`
+- Contact: `solve@ranchlink.com` (no hello@ritxma)
+
+### Claim flow (email PIN)
+- Scan QR → `/t/[tag_code]` → email+phone prompt → PIN to email → verify → form unlocks → attach → blockchain mint → ranch portal session
+- `claim_pin_challenges` table (migration 007)
+- `rl_claim_gate` cookie (HMAC-signed, 30min TTL, httpOnly)
+- `attach-tag` creates/updates `ranches` row with verified email+phone, sets `rl_rancher_portal` 90-day cookie
+
+### Rancher portal (`/ranch`)
+- Private dashboard for farmers (not Superadmin); shows herd linked to their ranch_id
+- Session via `rl_rancher_portal` cookie (HMAC-signed, ranch_id + email)
+
+### Security hardening
+- `middleware.ts`: X-Content-Type-Options, Referrer-Policy, Permissions-Policy, X-Frame-Options
+- `rl_owner_*` cookies now `httpOnly: true`
+- `/api/animals/[id]` returns tiered data (public card vs full record)
+- Removed all `127.0.0.1:7242` debug ingest calls
+- Order API requires secret for PII fields
+
+### DB migrations (session 6)
+- `007_CLAIM_PIN_AND_ORDER_VIEW_SECRET.sql` — `claim_pin_challenges` table + `order_view_secret` on stripe_orders
+- `008_ORDER_INTERNAL_FIELDS.sql` — `internal_notes` + `assigned_to` on stripe_orders
+
+---
+
+## 14. Open Issues (Not Yet Fixed)
 
 ### Issue A — Print state falsely set on OS dialog cancel ✅ FIXED (session 3)
 - **Fix:** `handlePrint()` now opens the print window, waits 800ms, then shows "Did the QR label print successfully?" confirm dialog. Only marks printed if user confirms.
 
-### Issue B — Security + Identity: full claim flow redesign (SESSION 4 SCOPE)
+### Issue B — Security + Identity: claim flow (PARTIALLY DONE — Session 6)
 
-#### The problem
-Tag codes are sequential (`RL-001`...`RL-029`) and the claim URL `/t/RL-029` is publicly accessible. Anyone who guesses a tag code can claim a tag without physical possession.
+#### What was implemented (session 6)
+- **Email PIN verification** gate on `/t/[tag_code]` before animal form — email + phone required, 6-digit PIN sent to email
+- `attach-tag` enforces `rl_claim_gate` cookie before allowing claim (superadmin bypass exists)
+- Rancher portal (`/ranch`) created automatically on claim with verified email + phone
+- `rl_owner_*` cookies made httpOnly
 
-#### Original design intent (to be restored)
-The QR sticker was always meant to encode a `claim_secret` — a random value generated at batch time that proves physical possession:
-```
-QR encodes:  https://ranch-link.vercel.app/t/RL-029?s=<claim_secret>
-Sticker shows (visible text): RL-029-A3F2B1C4  ← human-readable fallback for /start
-```
-The `claim_secret` is random, stored in DB, never derivable from the tag code alone.
-The token code (`RL-029-A3F2B1C4`) is the blockchain-derived human fallback — typed at `/start`.
-
-#### Agreed architecture for Session 4
-```
-Batch creation
-  → generate claim_secret (random UUID) per tag
-  → store in tags.claim_secret (new column)
-  → QR encodes: /t/RL-029?s=<claim_secret>
-  → token code (RL-029-A3F2B1C4) printed visibly on sticker as manual fallback
-
-Farmer scans QR → /t/RL-029?s=abc123
-  → system validates ?s= matches tags.claim_secret in DB
-  → if no match or missing → block with "Invalid tag" error
-  → if valid → show phone number input
-  → send SMS PIN (Twilio or similar)
-  → farmer enters PIN → identity confirmed
-  → proceed to animal form
-  → animal attached, custodial wallet created/linked
-  → farmer owns NFT, platform knows who holds which tag
-```
-
-#### What this does NOT change
-- Blockchain layer (anchorBatch, lazyMint, Merkle proofs) — untouched
-- Tag codes (RL-XXX) — still used as primary identifier
-- Token codes — still derived from mint_tx_hash at claim time
-- IPFS metadata — untouched
-
-#### Implementation steps (Session 4)
-1. Add `claim_secret` column to `tags` table (SQL migration)
-2. Generate `claim_secret` per tag in `factory/batches/route.ts` at batch creation
-3. Update QR URL generation to include `?s=<claim_secret>`
-4. Validate `?s=` param in `/t/[tag_code]/page.tsx` and `/api/attach-tag`
-5. Add phone number input + SMS PIN step before animal form
-6. Link phone to farmer record + custodial wallet in DB
-7. Update sticker print to show token code as visible fallback text
-
-#### Status
-Not yet implemented. Current batch (TST_ATX_270226, RL-012 to RL-029) does NOT have claim_secret. Safe for internal demo only — do not distribute publicly until implemented.
+#### Still remaining (future)
+- `claim_secret` per tag in QR URL (physical possession proof) — current tags don't encode it
+- **SMS** for PIN (today email-only via Resend); phone is validated by matching but not separately verified
+- Custodial wallet creation/linking on claim
+- `claim_secret` column + generation in `factory/batches` + QR URL encoding
+- These are important for **public tag distribution** security but not blocking for demo/controlled sales
 
 
 ---
 
-## 14. Session 4 — Kickoff Checklist
+## 15. Session 6 — Deployment Checklist
 
-Before writing any code, confirm these in order:
+### Supabase migrations to run
+1. `supabase/migrations/007_CLAIM_PIN_AND_ORDER_VIEW_SECRET.sql` — claim_pin_challenges table + order_view_secret
+2. `supabase/migrations/008_ORDER_INTERNAL_FIELDS.sql` — internal_notes + assigned_to on stripe_orders
 
-### Pre-flight
-- [x] Run Supabase SQL migration for `claim_token` (§8) — verify via `/api/superadmin/migrate`
-- [ ] Confirm TST_ATX_270226 tags (RL-012 to RL-029) are physically printed and in hand
-- [ ] Confirm Twilio (or SMS provider) account/credentials available for SMS PIN
+### Vercel env vars to set/verify
+- `RESEND_API_KEY` — for order confirmation + PIN + shipped emails
+- `ORDER_EMAIL_FROM` — e.g. `RanchLink <solve@ranchlink.com>`
+- `CLAIM_EMAIL_FROM` — e.g. `RanchLink <solve@ranchlink.com>`
+- `INTERNAL_OPS_EMAILS` — `solve@ranchlink.com,gonzalo@ritxma.com`
+- `SUPERADMIN_SESSION_SECRET` — ≥32 chars (used for all signed cookies)
+- `RANCHLINK_PORTAL_SECRET` — ≥16 chars (optional, defaults to session secret)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` — already configured
+- `NEXT_PUBLIC_BASE_URL` — `https://ranch-link.vercel.app`
 
-### Build order (do not skip steps)
-1. `tags.claim_secret` column migration
-2. Batch generation encodes `claim_secret` into QR URL
-3. `/t/[tag_code]` validates `?s=` before showing form
-4. Phone + SMS PIN gate before animal form
-5. Farmer/wallet record creation on PIN confirm
-6. Update sticker print layout with token code as visible fallback
+### Stripe webhook
+- Verify endpoint URL: `https://ranch-link.vercel.app/api/stripe/webhook`
+- Events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`
 
 ### Do NOT touch
 - `ranchLinkTag1155.ts` — blockchain layer is stable
 - `lib/ipfs/client.ts` — IPFS pinning is stable
-- `api/factory/batches/route.ts` Merkle tree logic — only add claim_secret generation
-- Any already-attached animals (AUS0001–AUS0006)
+- `api/factory/batches/route.ts` Merkle tree logic
+- Any already-attached animals (AUS0001–AUS0008+)
 
 ---
 

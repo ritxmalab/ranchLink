@@ -125,3 +125,36 @@ This file is the human-readable project log. Updated at the end of every Agent s
 - NFT transfer from server wallet to farmer wallet
 - Compliance section (delegate, sell cattle on-chain)
 
+---
+
+## Session: 2026-03-24 (Resume + START SESSION)
+
+### Context
+- **Progressive memory** updated (`PROGRESSIVE_MEMORY.md` §17): business-autonomy goals, Stripe/order/fulfillment reality vs gaps, Supabase RLS critical alerts (`rls_disabled_in_public`, `sensitive_columns_exposed`), public order API auth gap.
+- **Git HEAD at log time:** `135212c` (QR print pagination + prior order/Stripe work).
+
+### Priority order agreed
+1. Supabase RLS + policies (and secure `/api/orders/*` if exposing PII).
+2. Transactional email + customer auth / “my orders.”
+3. Superadmin: paid order → factory → fulfillment checklist.
+4. Ranch-scoped user + custodial wallet for ongoing updates.
+
+### Still pending from earlier sessions
+- Session 4 claim_secret + SMS PIN + farmer record (see `PROGRESSIVE_MEMORY.md` §13–§14) — not implemented; internal demo risk if tags are guessable.
+
+---
+
+## Session: 2026-03-27 — Internal fulfillment ecosystem polish
+
+### What changed
+1. **Stripe webhook** — Shipping name/phone/address now taken from **`shipping_details`** when Checkout collected a shipping address (falls back to `customer_details`). Fixes wrong/empty ship-to in `stripe_orders` and ops emails.
+2. **Order confirmation email** — If `ORDER_EMAIL_FROM` is missing, falls back to `CLAIM_EMAIL_FROM` or `RanchLink <solve@ranchlink.com>` (Resend domain verification still required).
+3. **Superadmin → Orders** — Orders **auto-load** when the tab opens after login. Expandable rows unchanged; added **Stripe Dashboard search** link + copyable session id, **Assigned** field on Save, **pending payment** in status dropdown. Removed redundant “Load order metrics” gate.
+4. **Docs** — `PROGRESSIVE_MEMORY.md` updated (§13 commerce, §9 bug table).
+
+### Ops checklist (production)
+- Stripe **webhook** URL points to `/api/stripe/webhook` with **`STRIPE_WEBHOOK_SECRET`** set in Vercel.
+- **`RESEND_API_KEY`**, verified **`ORDER_EMAIL_FROM`** (or fallback sender).
+- **`INTERNAL_OPS_EMAILS`** for team alerts on each paid order.
+- Supabase: run **`ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql`**, **`007_CLAIM_PIN_AND_ORDER_VIEW_SECRET.sql`** (if not yet), **`008_ORDER_INTERNAL_FIELDS.sql`** for `internal_notes` / `assigned_to`.
+

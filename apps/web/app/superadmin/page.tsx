@@ -100,6 +100,7 @@ interface SalesOrder {
   order_number: string | null
   stripe_checkout_session_id: string
   customer_email: string | null
+  customer_name: string | null
   tier: string | null
   tag_count: number
   amount_total: number | null
@@ -108,6 +109,16 @@ interface SalesOrder {
   fulfillment_status: string
   status: string
   created_at: string
+  shipping_name: string | null
+  shipping_phone: string | null
+  shipping_address_json: Record<string, string> | null
+  carrier: string | null
+  tracking_number: string | null
+  tracking_url: string | null
+  shipped_at: string | null
+  delivered_at: string | null
+  internal_notes: string | null
+  assigned_to: string | null
 }
 
 interface SalesMetrics {
@@ -225,9 +236,6 @@ function stickerHTML(tag: any, preset: StickerPreset): string {
 
   if (preset === 'sxsw') {
     const { bg, fg } = sxswColorsByTag(tag)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H1',location:'superadmin/page.tsx:stickerHTML:sxsw',message:'SXSW sticker content generated',data:{tagCode:tag?.tag_code||null,batch:tag?.batch_name||null,claimCodeLength:String(claimCode||'').length,specLineLength:String(specLine||'').length,color:tag?.color||null,bg,fg},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=0&data=${encodeURIComponent(url)}&bgcolor=${hexToDashRgb(bg)}&color=${hexToDashRgb(fg)}`
     return `
       <div class="sticker sxsw">
@@ -265,9 +273,6 @@ function getStickerCSS(preset: StickerPreset): string {
   const claimPt = isSXSW ? 4.5 : is50 ? 6.5 : 4
   const claimMax = isSXSW ? '40mm' : is50 ? '46mm' : '28mm'
   const gap = isSXSW ? '5mm' : is50 ? '6mm' : '4mm'
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H2',location:'superadmin/page.tsx:getStickerCSS',message:'Computed print CSS dimensions',data:{preset,sticker,img,tagCodePt,batchPt,specPt,claimPt,claimMax,gap:isSXSW?'5mm':is50?'6mm':'4mm'},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   return `
   @page {
     margin: 10mm;
@@ -329,9 +334,6 @@ function printSingleQR(tag: any, preset: StickerPreset = '30mm') {
   const effectivePreset = resolveStickerPresetForTag(tag, preset)
   const win = window.open('', '_blank', 'width=500,height=400')
   if (!win) { alert('Allow pop-ups to print QR labels.'); return }
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H3',location:'superadmin/page.tsx:printSingleQR:start',message:'Print single started',data:{tagCode:tag?.tag_code||null,preset,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>QR ${tag.tag_code}</title>
 <style>${getStickerCSS(effectivePreset)}</style></head>
@@ -360,9 +362,6 @@ function printBatchQR(tags: any[], preset: StickerPreset = '30mm') {
     pages.push(`<div class="page"><div class="grid">${stickersHtml}</div></div>`)
   }
   const pagesHtml = pages.join('')
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/d1bab796-07e5-40b1-a8e1-d8929352e341',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'da8bc1'},body:JSON.stringify({sessionId:'da8bc1',runId:'sxsw-print-pre',hypothesisId:'H4',location:'superadmin/page.tsx:printBatchQR:start',message:'Print batch started',data:{preset,effectivePreset,batchName,count:tags.length,firstTag:tags?.[0]?.tag_code||null,windowOpened:Boolean(win)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <title>Batch ${batchName} — ${tags.length} tags</title>
 <style>${getStickerCSS(effectivePreset)}
@@ -780,6 +779,12 @@ export default function SuperAdminPage() {
       setIsLoadingOrders(false)
     }
   }, [])
+
+  // Auto-load orders when opening the Orders tab (internal fulfillment pipeline).
+  useEffect(() => {
+    if (authed !== true || activeTab !== 'orders') return
+    fetchOrders()
+  }, [authed, activeTab, fetchOrders])
 
   // Check superadmin auth on mount via server-side session verification.
   useEffect(() => {
@@ -1826,10 +1831,8 @@ export default function SuperAdminPage() {
               </button>
             </div>
 
-            {!salesMetrics && !isLoadingOrders && (
-              <div className="mb-4">
-                <button onClick={fetchOrders} className="btn-primary">Load order metrics</button>
-              </div>
+            {isLoadingOrders && orders.length === 0 && (
+              <p className="text-[var(--c4)] text-sm mb-4">Loading orders…</p>
             )}
 
             {salesMetrics && (
@@ -1859,57 +1862,163 @@ export default function SuperAdminPage() {
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left py-2 px-3">Order</th>
-                    <th className="text-left py-2 px-3">Customer</th>
-                    <th className="text-left py-2 px-3">Tier</th>
-                    <th className="text-left py-2 px-3">Tags</th>
-                    <th className="text-left py-2 px-3">Amount</th>
-                    <th className="text-left py-2 px-3">Payment</th>
-                    <th className="text-left py-2 px-3">Fulfillment</th>
-                    <th className="text-left py-2 px-3">Created</th>
-                    <th className="text-left py-2 px-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((order) => (
-                    <tr key={order.stripe_checkout_session_id} className="border-b border-white/5">
-                      <td className="py-2 px-3 font-mono">{order.order_number || 'Pending...'}</td>
-                      <td className="py-2 px-3">{order.customer_email || 'N/A'}</td>
-                      <td className="py-2 px-3">{order.tier || 'N/A'}</td>
-                      <td className="py-2 px-3">{order.tag_count || 0}</td>
-                      <td className="py-2 px-3">
-                        {order.amount_total && order.currency
-                          ? new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: order.currency.toUpperCase(),
-                            }).format(order.amount_total / 100)
-                          : 'N/A'}
-                      </td>
-                      <td className="py-2 px-3 capitalize">{order.payment_status}</td>
-                      <td className="py-2 px-3 capitalize">{order.fulfillment_status?.replace(/_/g, ' ') || 'N/A'}</td>
-                      <td className="py-2 px-3">{new Date(order.created_at).toLocaleString()}</td>
-                      <td className="py-2 px-3">
-                        {order.order_number && (
-                          <select
-                            defaultValue=""
-                            className="text-xs bg-[var(--bg-secondary)] border border-white/20 rounded px-1 py-1"
-                            onChange={async (e) => {
-                              const selected = e.target.value
-                              e.target.value = ''
-                              if (!selected) return
+            <div className="space-y-3">
+              {!orders.length && !isLoadingOrders && (
+                <div className="py-8 text-center text-[var(--c4)]">No orders yet.</div>
+              )}
+              {orders.map((order) => {
+                const amt =
+                  order.amount_total && order.currency
+                    ? new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: order.currency.toUpperCase(),
+                      }).format(order.amount_total / 100)
+                    : 'N/A'
+
+                const addr = order.shipping_address_json
+                const addrStr = addr
+                  ? [addr.line1, addr.line2, [addr.city, addr.state, addr.postal_code].filter(Boolean).join(' '), addr.country]
+                      .filter(Boolean)
+                      .join(', ')
+                  : null
+
+                const isPaid =
+                  order.payment_status === 'paid' || order.payment_status === 'no_payment_required'
+                const needsAction =
+                  isPaid && (!order.fulfillment_status || order.fulfillment_status === 'paid_unfulfilled')
+
+                return (
+                  <details
+                    key={order.stripe_checkout_session_id}
+                    className={`rounded-lg border ${
+                      needsAction
+                        ? 'border-yellow-500/50 bg-yellow-950/10'
+                        : 'border-white/10 bg-[var(--bg-card)]'
+                    }`}
+                  >
+                    <summary className="cursor-pointer px-4 py-3 flex flex-wrap items-center gap-3 text-sm">
+                      <span className="font-mono font-semibold">{order.order_number || 'Pending…'}</span>
+                      <span className="text-[var(--c4)]">{order.customer_email || '—'}</span>
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-white/10">{order.tier || '—'}</span>
+                      <span className="font-semibold">{amt}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                        isPaid ? 'bg-green-900/30 text-green-400' : 'bg-gray-800 text-gray-400'
+                      }`}>{order.payment_status}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold capitalize ${
+                        needsAction ? 'bg-yellow-900/30 text-yellow-300' : 'bg-white/5 text-[var(--c4)]'
+                      }`}>{(order.fulfillment_status || 'pending').replace(/_/g, ' ')}</span>
+                      {needsAction && <span className="text-yellow-400 text-xs font-bold">ACTION NEEDED</span>}
+                      <span className="ml-auto text-xs text-[var(--c4)]">{new Date(order.created_at).toLocaleString()}</span>
+                    </summary>
+
+                    <div className="px-4 pb-4 pt-1 space-y-4 border-t border-white/5">
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <a
+                          href={`https://dashboard.stripe.com/search?query=${encodeURIComponent(order.stripe_checkout_session_id)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[var(--c2)] hover:underline"
+                        >
+                          Search in Stripe Dashboard ↗
+                        </a>
+                        <span className="text-[var(--c4)]">·</span>
+                        <span className="text-[var(--c4)] font-mono select-all">{order.stripe_checkout_session_id}</span>
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-xs uppercase text-[var(--c4)] mb-2 font-semibold">Customer</h4>
+                          <p className="text-sm"><span className="text-[var(--c4)]">Email:</span> {order.customer_email || '—'}</p>
+                          <p className="text-sm"><span className="text-[var(--c4)]">Name:</span> {order.shipping_name || order.customer_name || '—'}</p>
+                          <p className="text-sm"><span className="text-[var(--c4)]">Phone:</span> {order.shipping_phone || '—'}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs uppercase text-[var(--c4)] mb-2 font-semibold">Ship to</h4>
+                          <p className="text-sm">{addrStr || 'No address on file'}</p>
+                          {order.carrier && <p className="text-sm mt-1"><span className="text-[var(--c4)]">Carrier:</span> {order.carrier}</p>}
+                          {order.tracking_number && <p className="text-sm"><span className="text-[var(--c4)]">Tracking:</span> {order.tracking_number}</p>}
+                          {order.tracking_url && (
+                            <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-xs text-[var(--c2)] hover:underline">
+                              Open tracking link →
+                            </a>
+                          )}
+                          {order.shipped_at && <p className="text-xs text-[var(--c4)] mt-1">Shipped: {new Date(order.shipped_at).toLocaleString()}</p>}
+                          {order.delivered_at && <p className="text-xs text-[var(--c4)]">Delivered: {new Date(order.delivered_at).toLocaleString()}</p>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xs uppercase text-[var(--c4)] mb-2 font-semibold">Purchase</h4>
+                        <p className="text-sm">
+                          {order.tag_count} tags · {order.tier || '—'} · {amt}
+                        </p>
+                      </div>
+
+                      {order.internal_notes && (
+                        <div>
+                          <h4 className="text-xs uppercase text-[var(--c4)] mb-1 font-semibold">Internal notes</h4>
+                          <p className="text-sm whitespace-pre-wrap bg-white/5 rounded p-2">{order.internal_notes}</p>
+                        </div>
+                      )}
+
+                      {order.order_number && (
+                        <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-white/5">
+                          <div>
+                            <label className="text-xs text-[var(--c4)] block mb-1">Status</label>
+                            <select
+                              id={`status-${order.order_number}`}
+                              defaultValue={order.fulfillment_status || 'paid_unfulfilled'}
+                              className="text-xs bg-[var(--bg-secondary)] border border-white/20 rounded px-2 py-1.5"
+                            >
+                              <option value="pending_payment">Pending payment</option>
+                              <option value="paid_unfulfilled">Paid / Unfulfilled</option>
+                              <option value="packed">Packed</option>
+                              <option value="shipped">Shipped</option>
+                              <option value="delivered">Delivered</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+                          <div className="w-28">
+                            <label className="text-xs text-[var(--c4)] block mb-1">Assigned</label>
+                            <input
+                              id={`assign-${order.order_number}`}
+                              type="text"
+                              defaultValue={order.assigned_to || ''}
+                              placeholder="Owner"
+                              className="w-full text-xs bg-[var(--bg-secondary)] border border-white/20 rounded px-2 py-1.5"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-[200px]">
+                            <label className="text-xs text-[var(--c4)] block mb-1">Notes</label>
+                            <input
+                              id={`notes-${order.order_number}`}
+                              type="text"
+                              defaultValue={order.internal_notes || ''}
+                              placeholder="Internal notes…"
+                              className="w-full text-xs bg-[var(--bg-secondary)] border border-white/20 rounded px-2 py-1.5"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1.5 rounded bg-[var(--c2)] text-black font-semibold hover:opacity-90"
+                            onClick={async () => {
+                              const statusEl = document.getElementById(`status-${order.order_number}`) as HTMLSelectElement
+                              const notesEl = document.getElementById(`notes-${order.order_number}`) as HTMLInputElement
+                              const assignEl = document.getElementById(`assign-${order.order_number}`) as HTMLInputElement
+                              const selected = statusEl?.value
+                              const notes = notesEl?.value ?? ''
+                              const assignedTo = assignEl?.value ?? ''
 
                               let carrier: string | null = null
                               let trackingNumber: string | null = null
                               let trackingUrl: string | null = null
+                              let sendShipped = false
 
-                              if (selected === 'shipped') {
-                                carrier = window.prompt('Carrier (UPS/FedEx/USPS):', '') || null
-                                trackingNumber = window.prompt('Tracking number:', '') || null
-                                trackingUrl = window.prompt('Tracking URL (optional):', '') || null
+                              if (selected === 'shipped' && order.fulfillment_status !== 'shipped') {
+                                carrier = window.prompt('Carrier (UPS / FedEx / USPS / DHL):', order.carrier || '') || null
+                                trackingNumber = window.prompt('Tracking number:', order.tracking_number || '') || null
+                                trackingUrl = window.prompt('Tracking URL (optional):', order.tracking_url || '') || null
+                                sendShipped = window.confirm('Send shipping notification email to customer?')
                               }
 
                               const response = await fetch('/api/superadmin/orders', {
@@ -1922,32 +2031,27 @@ export default function SuperAdminPage() {
                                   carrier,
                                   tracking_number: trackingNumber,
                                   tracking_url: trackingUrl,
+                                  internal_notes: notes,
+                                  assigned_to: assignedTo,
+                                  send_shipped_email: sendShipped,
                                 }),
                               })
                               const data = await response.json()
                               if (!response.ok) {
-                                alert(`Failed to update order: ${data.error || 'Unknown error'}`)
+                                alert(`Failed: ${data.error || 'Unknown error'}`)
                                 return
                               }
                               await fetchOrders()
                             }}
                           >
-                            <option value="">Set status ▾</option>
-                            <option value="paid_unfulfilled">Paid / Unfulfilled</option>
-                            <option value="packed">Packed</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!orders.length && !isLoadingOrders && (
-                <div className="py-8 text-center text-[var(--c4)]">No orders yet.</div>
-              )}
+                            Save
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )
+              })}
             </div>
           </div>
         )}
