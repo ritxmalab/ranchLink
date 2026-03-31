@@ -83,7 +83,10 @@ export async function generateRanchWallet(ranchId: string): Promise<{ address: s
 
 export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.ORDER_EMAIL_FROM || 'RanchLink <solve@ritxma.com>'
+  const from =
+    process.env.ORDER_EMAIL_FROM ||
+    process.env.CLAIM_EMAIL_FROM ||
+    'RanchLink <solve@ranchlink.com>'
   if (!apiKey) {
     console.error('[AUTH] RESEND_API_KEY not configured')
     return false
@@ -121,7 +124,10 @@ export async function sendVerificationEmail(email: string, code: string): Promis
 
 export async function sendFulfillmentEmail(to: string, subject: string, htmlBody: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.ORDER_EMAIL_FROM || 'RanchLink <solve@ritxma.com>'
+  const from =
+    process.env.ORDER_EMAIL_FROM ||
+    process.env.CLAIM_EMAIL_FROM ||
+    'RanchLink <solve@ranchlink.com>'
   if (!apiKey) return false
 
   try {

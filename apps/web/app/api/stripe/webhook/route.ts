@@ -38,14 +38,17 @@ async function sendOrderEmail(params: {
   currency: string | null
   tagCount: number
   tier: string | null | undefined
-}) {
+}): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   const from =
     process.env.ORDER_EMAIL_FROM ||
     process.env.CLAIM_EMAIL_FROM ||
     'RanchLink <solve@ranchlink.com>'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
-  if (!apiKey) return
+  if (!apiKey) {
+    console.warn('[sendOrderEmail] RESEND_API_KEY missing')
+    return false
+  }
 
   const formattedAmount =
     params.amountTotal && params.currency
@@ -55,17 +58,18 @@ async function sendOrderEmail(params: {
         }).format(params.amountTotal / 100)
       : 'N/A'
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [params.to],
-      subject: `RanchLink order confirmation ${params.orderNumber}`,
-      html: `
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [params.to],
+        subject: `RanchLink order confirmation ${params.orderNumber}`,
+        html: `
         <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111">
           <h2>Thanks for your RanchLink purchase</h2>
           <p>Your order is confirmed and now in the production queue.</p>
@@ -78,8 +82,18 @@ async function sendOrderEmail(params: {
           <p style="color:#555;font-size:13px">Support: <a href="mailto:solve@ranchlink.com">solve@ranchlink.com</a></p>
         </div>
       `,
-    }),
-  })
+      }),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.warn('[sendOrderEmail] Resend error', res.status, errText)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[sendOrderEmail] fetch failed', e)
+    return false
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -243,18 +257,18 @@ export async function POST(request: NextRequest) {
     const confirmationAlreadySent = Boolean(row.order_confirmation_sent_at)
     const opsAlreadyNotified = Boolean(row.internal_ops_notified_at)
 
-    // Customer confirmation (idempotent when migration 009 applied)
+    // Customer confirmation — only mark sent after Resend returns 2xx (webhook retries can resend otherwise)
     if (session.customer_details?.email && !confirmationAlreadySent) {
-      try {
-        await sendOrderEmail({
-          to: session.customer_details.email,
-          orderNumber,
-          orderViewSecret: secretForEmail,
-          amountTotal: session.amount_total ?? null,
-          currency: session.currency ?? null,
-          tagCount,
-          tier,
-        })
+      const customerOk = await sendOrderEmail({
+        to: session.customer_details.email,
+        orderNumber,
+        orderViewSecret: secretForEmail,
+        amountTotal: session.amount_total ?? null,
+        currency: session.currency ?? null,
+        tagCount,
+        tier,
+      })
+      if (customerOk) {
         const { error: confErr } = await supabaseMail
           .from('stripe_orders')
           .update({ order_confirmation_sent_at: new Date().toISOString() })
@@ -262,26 +276,24 @@ export async function POST(request: NextRequest) {
         if (confErr && !/order_confirmation_sent_at|does not exist|schema cache/i.test(confErr.message || '')) {
           console.warn('[webhook] order_confirmation_sent_at update', confErr.message)
         }
-      } catch (emailError) {
-        console.warn('Order email warning', emailError)
       }
     }
 
-    // Internal ops — ship-to + link to Superadmin + customer private tracking URL
+    // Internal ops — same: only stamp idempotency after successful send
     if (!opsAlreadyNotified) {
-      try {
-        await sendInternalOpsNotification({
-          orderNumber,
-          orderViewSecret: secretForEmail,
-          tier,
-          tagCount,
-          amountTotal: session.amount_total ?? null,
-          currency: session.currency ?? null,
-          customerEmail: session.customer_details?.email ?? null,
-          customerName: session.customer_details?.name ?? shippingName ?? null,
-          shippingPhone,
-          shippingAddress,
-        })
+      const opsOk = await sendInternalOpsNotification({
+        orderNumber,
+        orderViewSecret: secretForEmail,
+        tier,
+        tagCount,
+        amountTotal: session.amount_total ?? null,
+        currency: session.currency ?? null,
+        customerEmail: session.customer_details?.email ?? null,
+        customerName: session.customer_details?.name ?? shippingName ?? null,
+        shippingPhone,
+        shippingAddress,
+      })
+      if (opsOk) {
         const { error: opsErr } = await supabaseMail
           .from('stripe_orders')
           .update({ internal_ops_notified_at: new Date().toISOString() })
@@ -289,8 +301,6 @@ export async function POST(request: NextRequest) {
         if (opsErr && !/internal_ops_notified_at|does not exist|schema cache/i.test(opsErr.message || '')) {
           console.warn('[webhook] internal_ops_notified_at update', opsErr.message)
         }
-      } catch (opsErr) {
-        console.warn('Internal ops email warning', opsErr)
       }
     }
     }
@@ -310,7 +320,7 @@ async function sendInternalOpsNotification(params: {
   customerName: string | null
   shippingPhone: string | null
   shippingAddress: any
-}) {
+}): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY
   const from =
     process.env.INTERNAL_OPS_EMAIL_FROM ||
@@ -321,11 +331,11 @@ async function sendInternalOpsNotification(params: {
   const to = rawTo.split(',').map((e) => e.trim()).filter(Boolean)
   if (!apiKey) {
     console.warn('[sendInternalOpsNotification] RESEND_API_KEY missing')
-    return
+    return false
   }
   if (!to.length) {
     console.warn('[sendInternalOpsNotification] INTERNAL_OPS_EMAILS empty')
-    return
+    return false
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
@@ -345,14 +355,15 @@ async function sendInternalOpsNotification(params: {
         .join('<br/>')
     : 'Not provided yet'
 
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to,
-      subject: `NEW PAID ORDER ${params.orderNumber} — ${params.tier || 'N/A'} (${params.tagCount} tags) — ${amount}`,
-      html: `
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `NEW PAID ORDER ${params.orderNumber} — ${params.tier || 'N/A'} (${params.tagCount} tags) — ${amount}`,
+        html: `
         <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px">
           <h2 style="color:#16a34a">New Paid Order — Action Required</h2>
           <table style="border-collapse:collapse;width:100%">
@@ -370,6 +381,16 @@ async function sendInternalOpsNotification(params: {
           <a href="${customerPrivateUrl}" style="word-break:break-all;color:#2563eb">${customerPrivateUrl}</a></p>
         </div>
       `,
-    }),
-  })
+      }),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.warn('[sendInternalOpsNotification] Resend error', res.status, errText)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.warn('[sendInternalOpsNotification] fetch failed', e)
+    return false
+  }
 }

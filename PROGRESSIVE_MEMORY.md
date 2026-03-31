@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-31 (session 9 — internal fulfillment metrics + migrate checks + env template) | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-31 (session 10 — webhook idempotency only after Resend OK; Superadmin “Copy webhook URL”) | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -93,7 +93,7 @@ Factory (batch generation)
 - `apps/web/app/t/[tag_code]/page.tsx` — Tag claim flow with inline scanner
 - `apps/web/app/a/[public_id]/page.tsx` — Public animal card (owner-only updates)
 - `apps/web/app/dashboard/page.tsx` — Ranch dashboard with animal cards + photos
-- `apps/web/app/superadmin/page.tsx` — Factory/Assemble/Dashboard/Inventory tabs
+- `apps/web/app/superadmin/page.tsx` — Factory / Assemble / Dashboard / Inventory / **Orders** (internal fulfillment CRM)
 
 ### API Routes
 - `apps/web/app/api/factory/batches/route.ts` — Generate batch (anchorBatch on-chain)
@@ -133,7 +133,7 @@ Factory (batch generation)
 
 ### Commerce (internal — no external CRM)
 - **Stripe** Checkout → webhook `POST /api/stripe/webhook` updates `stripe_orders` (ship-to from `shipping_details`, billing fallback).
-- **Paid:** customer confirmation email + **internal ops email** to `INTERNAL_OPS_EMAILS` (Resend), idempotent via `order_confirmation_sent_at` / `internal_ops_notified_at` (migrations 009 + 010).
+- **Paid:** customer confirmation email + **internal ops email** to `INTERNAL_OPS_EMAILS` (Resend). Idempotency timestamps are set **only after Resend returns 2xx** so failed sends retry on Stripe webhook redelivery (migrations 009 + 010).
 - **Superadmin → Orders:** expandable rows — full address, Stripe session link, assignee, internal notes, status (packed/shipped/delivered); shipped/delivered emails to customer via `sendFulfillmentEmail`.
 - **Health check:** `POST /api/superadmin/migrate` (authed) probes `tags.claim_token` + `stripe_orders` columns and prints which SQL files to run.
 - **Env template:** `apps/web/.env.example` lists Stripe prices, `RESEND_API_KEY`, `ORDER_EMAIL_FROM`, `INTERNAL_OPS_EMAILS`, `STRIPE_WEBHOOK_SECRET`, etc.

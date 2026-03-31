@@ -1830,11 +1830,27 @@ export default function SuperAdminPage() {
                 <code className="text-xs bg-black/30 px-1 rounded">INTERNAL_OPS_EMAILS</code> when{' '}
                 <code className="text-xs bg-black/30 px-1 rounded">RESEND_API_KEY</code> is set.
               </p>
-              <p>
-                Stripe <strong>must</strong> call{' '}
-                <code className="text-xs bg-black/30 px-1 rounded">POST /api/stripe/webhook</code> on this deployment with{' '}
+              <p className="flex flex-wrap items-center gap-2">
+                Stripe <strong>must</strong> call your deployment’s webhook with{' '}
                 <code className="text-xs bg-black/30 px-1 rounded">STRIPE_WEBHOOK_SECRET</code>.
-                Health: Superadmin → run <code className="text-xs bg-black/30 px-1 rounded">POST /api/superadmin/migrate</code> (checks SQL + reminds webhook).
+                <button
+                  type="button"
+                  className="text-xs px-2 py-1 rounded bg-cyan-800/50 hover:bg-cyan-700/60 text-cyan-100 border border-cyan-600/40"
+                  onClick={() => {
+                    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/stripe/webhook`
+                    if (navigator.clipboard?.writeText) {
+                      navigator.clipboard.writeText(url).then(() => alert('Copied webhook URL:\n' + url)).catch(() => window.prompt('Copy webhook URL:', url))
+                    } else {
+                      window.prompt('Copy webhook URL:', url)
+                    }
+                  }}
+                >
+                  Copy webhook URL
+                </button>
+                <span className="text-xs text-cyan-200/70">(paste in Stripe → Developers → Webhooks)</span>
+              </p>
+              <p>
+                Health: authenticated <code className="text-xs bg-black/30 px-1 rounded">POST /api/superadmin/migrate</code> probes DB columns and lists missing SQL.
               </p>
               <p className="text-xs text-cyan-200/80">
                 Migrations under <code className="bg-black/30 px-1 rounded">supabase/migrations/</code>:{' '}

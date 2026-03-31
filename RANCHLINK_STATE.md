@@ -174,3 +174,14 @@ This file is the human-readable project log. Updated at the end of every Agent s
 - Set **`RESEND_API_KEY`** + verified **`ORDER_EMAIL_FROM`**; set **`INTERNAL_OPS_EMAILS`** for team alerts.
 - Run missing SQL from migrate endpoint output in Supabase.
 
+---
+
+## Session: 2026-03-31 (Part 2) — Webhook email reliability + ops copy UX
+
+### What changed
+1. **`/api/stripe/webhook`** — `sendOrderEmail` and `sendInternalOpsNotification` now return success only when Resend responds **2xx**. Idempotency columns `order_confirmation_sent_at` and `internal_ops_notified_at` are updated **only after** a successful send, so Stripe retries can deliver mail if the first attempt failed (previously timestamps could be set even when Resend errored).
+2. **Superadmin → Orders** — **Copy webhook URL** button copies `{origin}/api/stripe/webhook` for pasting into Stripe Dashboard → Webhooks.
+
+### No breaking changes
+- Existing paid flows, Superadmin order rows, and customer order pages unchanged.
+
