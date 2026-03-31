@@ -55,8 +55,9 @@ export async function GET(request: NextRequest) {
     )
     const totalRevenueCents = paidOrders.reduce((sum, row) => sum + (row.amount_total || 0), 0)
     const totalTagsScheduled = paidOrders.reduce((sum, row) => sum + (row.tag_count || 0), 0)
-    const pendingFulfillment = paidOrders.filter(
-      (row) => row.fulfillment_status === 'paid_unfulfilled'
+    // Needs warehouse action: paid but not yet shipped/delivered/cancelled
+    const pendingFulfillment = paidOrders.filter((row) =>
+      ['paid_unfulfilled', 'packed'].includes(row.fulfillment_status || '')
     ).length
 
     return NextResponse.json({

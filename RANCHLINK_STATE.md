@@ -156,5 +156,21 @@ This file is the human-readable project log. Updated at the end of every Agent s
 - Stripe **webhook** URL points to `/api/stripe/webhook` with **`STRIPE_WEBHOOK_SECRET`** set in Vercel.
 - **`RESEND_API_KEY`**, verified **`ORDER_EMAIL_FROM`** (or fallback sender).
 - **`INTERNAL_OPS_EMAILS`** for team alerts on each paid order.
-- Supabase: run **`ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql`**, **`007_CLAIM_PIN_AND_ORDER_VIEW_SECRET.sql`** (if not yet), **`008_ORDER_INTERNAL_FIELDS.sql`** for `internal_notes` / `assigned_to`.
+- Supabase: run **`ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql`**, then **`008_STRIPE_ORDERS_INTERNAL_OPS.sql`**, **`009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY.sql`**, **`010_ORDER_VIEW_SECRET.sql`** (and claim-pin migration if using email PIN gate).
+
+---
+
+## Session: 2026-03-31 — Fulfillment health + env template
+
+### What changed
+1. **`GET /api/superadmin/orders`** — `pending_fulfillment` metric now counts **`paid_unfulfilled` + `packed`** (still awaiting ship).
+2. **`POST /api/superadmin/migrate`** — Probes `stripe_orders` columns for fulfillment, CRM, email idempotency, and `order_view_secret`; returns which files under `supabase/migrations/` to run + Stripe webhook reminder.
+3. **`apps/web/.env.example`** — Rewritten as the canonical template: Stripe prices, Resend, `INTERNAL_OPS_EMAILS`, portal secret, superadmin, Supabase, contracts.
+4. **Superadmin Orders tab** — Banner copy updated (webhook, migrate health, migration order).
+5. **`PROGRESSIVE_MEMORY.md`** — URLs, auth notes, commerce pipeline, env §11 aligned with current code.
+
+### If “people buy and nothing happens”
+- Confirm **Stripe webhook** delivers to production URL and returns 200 (Vercel logs / Stripe Dashboard → Webhooks).
+- Set **`RESEND_API_KEY`** + verified **`ORDER_EMAIL_FROM`**; set **`INTERNAL_OPS_EMAILS`** for team alerts.
+- Run missing SQL from migrate endpoint output in Supabase.
 

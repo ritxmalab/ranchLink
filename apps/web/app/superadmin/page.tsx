@@ -1823,14 +1823,23 @@ export default function SuperAdminPage() {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="card">
-            <div className="mb-4 rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-100/90">
-              <strong className="text-cyan-300">Internal fulfillment</strong> — Expand a row for ship-to, Stripe session link, and CRM fields.
-              New paid orders email <code className="text-xs bg-black/30 px-1 rounded">INTERNAL_OPS_EMAILS</code> if{' '}
-              <code className="text-xs bg-black/30 px-1 rounded">RESEND_API_KEY</code> is set. Webhook must hit{' '}
-              <code className="text-xs bg-black/30 px-1 rounded">/api/stripe/webhook</code> on Vercel.
-              Run SQL migrations: <code className="text-xs bg-black/30 px-1 rounded">010_ORDER_VIEW_SECRET</code>,{' '}
-              <code className="text-xs bg-black/30 px-1 rounded">009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY</code>,{' '}
-              <code className="text-xs bg-black/30 px-1 rounded">008_STRIPE_ORDERS_INTERNAL_OPS</code>.
+            <div className="mb-4 rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-100/90 space-y-2">
+              <p>
+                <strong className="text-cyan-300">Internal fulfillment</strong> — Expand a row for ship-to, Stripe session link, notes, assignee, and status.
+                On payment, customers get a confirmation email and your team gets an alert to{' '}
+                <code className="text-xs bg-black/30 px-1 rounded">INTERNAL_OPS_EMAILS</code> when{' '}
+                <code className="text-xs bg-black/30 px-1 rounded">RESEND_API_KEY</code> is set.
+              </p>
+              <p>
+                Stripe <strong>must</strong> call{' '}
+                <code className="text-xs bg-black/30 px-1 rounded">POST /api/stripe/webhook</code> on this deployment with{' '}
+                <code className="text-xs bg-black/30 px-1 rounded">STRIPE_WEBHOOK_SECRET</code>.
+                Health: Superadmin → run <code className="text-xs bg-black/30 px-1 rounded">POST /api/superadmin/migrate</code> (checks SQL + reminds webhook).
+              </p>
+              <p className="text-xs text-cyan-200/80">
+                Migrations under <code className="bg-black/30 px-1 rounded">supabase/migrations/</code>:{' '}
+                ADD_STRIPE_ORDERS_TABLE → ADD_STRIPE_ORDER_FULFILLMENT_FIELDS → 008_STRIPE_ORDERS_INTERNAL_OPS → 009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY → 010_ORDER_VIEW_SECRET
+              </p>
             </div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Sales & Orders</h2>

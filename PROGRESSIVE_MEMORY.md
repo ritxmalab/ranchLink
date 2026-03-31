@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-31 (session 8 — commerce + fulfillment; build verified) | **Build:** `npm run build` OK | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-31 (session 9 — internal fulfillment metrics + migrate checks + env template) | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -26,6 +26,10 @@ RanchLink is a blockchain-linked cattle tag system. Physical 3D-printed tags (PE
 | Animal Card | https://ranch-link.vercel.app/a/[public_id] |
 | Dashboard | https://ranch-link.vercel.app/dashboard |
 | Superadmin | https://ranch-link.vercel.app/superadmin |
+| Superadmin → Orders | Same URL, tab **💳 Orders** (internal CRM: ship-to, tracking, notes) |
+| Ranch portal (farmer) | https://ranch-link.vercel.app/ranch |
+| Order tracking (customer) | https://ranch-link.vercel.app/order/[order_number]?k=… |
+| Checkout success | https://ranch-link.vercel.app/checkout/success |
 | Marketplace | https://ranch-link.vercel.app/marketplace |
 
 ---
@@ -119,14 +123,20 @@ Factory (batch generation)
 ## 5. Authentication
 
 ### Superadmin
-- Cookie: `rl_superadmin=<value>` — set by `/api/superadmin/login`, `httpOnly: false` (readable by JS)
+- Cookie: `rl_superadmin` — set by `/api/superadmin/login`, **httpOnly: true**, signed (`SUPERADMIN_SESSION_SECRET`)
 - All superadmin API calls require `credentials: 'include'`
 - Superadmin can edit any animal via `/a/[public_id]?superadmin=1`
 
 ### Tag Ownership (Farmer)
-- Cookie: `rl_owner_<public_id>=<claim_token>` — set at attach time, `httpOnly: false`
-- `claim_token` stored in `tags.claim_token` (UUID) — **PENDING MIGRATION** (see §8)
-- Until migration runs, ownership check is permissive (allows updates when column is null)
+- Cookie: `rl_owner_<public_id>` — set at attach time; prefer **httpOnly** in current `attach-tag` (server reads cookie on `update-animal` / animal GET)
+- `claim_token` stored in `tags.claim_token` (UUID); migration should be applied in prod
+
+### Commerce (internal — no external CRM)
+- **Stripe** Checkout → webhook `POST /api/stripe/webhook` updates `stripe_orders` (ship-to from `shipping_details`, billing fallback).
+- **Paid:** customer confirmation email + **internal ops email** to `INTERNAL_OPS_EMAILS` (Resend), idempotent via `order_confirmation_sent_at` / `internal_ops_notified_at` (migrations 009 + 010).
+- **Superadmin → Orders:** expandable rows — full address, Stripe session link, assignee, internal notes, status (packed/shipped/delivered); shipped/delivered emails to customer via `sendFulfillmentEmail`.
+- **Health check:** `POST /api/superadmin/migrate` (authed) probes `tags.claim_token` + `stripe_orders` columns and prints which SQL files to run.
+- **Env template:** `apps/web/.env.example` lists Stripe prices, `RESEND_API_KEY`, `ORDER_EMAIL_FROM`, `INTERNAL_OPS_EMAILS`, `STRIPE_WEBHOOK_SECRET`, etc.
 
 ---
 
@@ -217,15 +227,17 @@ This enables the farmer ownership system. Migration has been run; attach-tag now
 
 ## 11. Environment Variables (Vercel + .env.local)
 
-Key vars (never commit values):
-- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
-- `SUPABASE_SERVICE_KEY` — Service role key (server-only)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Anon key
-- `RANCHLINK_PRIVATE_KEY` — Server wallet private key (minting)
-- `RANCHLINKTAG_1155_ADDRESS` — ERC-1155 contract address
-- `PINATA_JWT` — Pinata IPFS JWT
-- `SUPERADMIN_PASSWORD` — Superadmin login password
-- `NEXT_PUBLIC_APP_URL` — https://ranch-link.vercel.app
+Canonical list: **`apps/web/.env.example`**. Never commit real secrets.
+
+**Core:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_BASE_URL`, `PINATA_JWT`, server wallet + contract envs per architecture rule.
+
+**Superadmin:** `SUPERADMIN_USERNAME`, `SUPERADMIN_PASSWORD`, `SUPERADMIN_SESSION_SECRET` (≥32 chars).
+
+**Stripe store:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_PRICE_SINGLE`, `STRIPE_PRICE_FIVE_PACK`, `STRIPE_PRICE_STACK`, plus any extra tier price IDs used on the storefront.
+
+**Email (Resend):** `RESEND_API_KEY`, `ORDER_EMAIL_FROM`, optional `CLAIM_EMAIL_FROM`, **`INTERNAL_OPS_EMAILS`** (comma-separated, e.g. `solve@ranchlink.com,gonzalo@ritxma.com`), optional `INTERNAL_OPS_EMAIL_FROM`, optional `FULFILLMENT_EMAIL_ON_PACKED=1`.
+
+**Claim / portal:** `RANCHLINK_PORTAL_SECRET` (or rely on `SUPERADMIN_SESSION_SECRET` for signed cookies).
 
 ---
 
