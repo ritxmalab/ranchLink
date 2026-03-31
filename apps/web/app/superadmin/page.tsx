@@ -119,6 +119,9 @@ interface SalesOrder {
   delivered_at: string | null
   internal_notes: string | null
   assigned_to: string | null
+  order_view_secret?: string | null
+  order_confirmation_sent_at?: string | null
+  internal_ops_notified_at?: string | null
 }
 
 interface SalesMetrics {
@@ -1820,6 +1823,15 @@ export default function SuperAdminPage() {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="card">
+            <div className="mb-4 rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-100/90">
+              <strong className="text-cyan-300">Internal fulfillment</strong> — Expand a row for ship-to, Stripe session link, and CRM fields.
+              New paid orders email <code className="text-xs bg-black/30 px-1 rounded">INTERNAL_OPS_EMAILS</code> if{' '}
+              <code className="text-xs bg-black/30 px-1 rounded">RESEND_API_KEY</code> is set. Webhook must hit{' '}
+              <code className="text-xs bg-black/30 px-1 rounded">/api/stripe/webhook</code> on Vercel.
+              Run SQL migrations: <code className="text-xs bg-black/30 px-1 rounded">010_ORDER_VIEW_SECRET</code>,{' '}
+              <code className="text-xs bg-black/30 px-1 rounded">009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY</code>,{' '}
+              <code className="text-xs bg-black/30 px-1 rounded">008_STRIPE_ORDERS_INTERNAL_OPS</code>.
+            </div>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Sales & Orders</h2>
               <button
@@ -1912,7 +1924,7 @@ export default function SuperAdminPage() {
                     </summary>
 
                     <div className="px-4 pb-4 pt-1 space-y-4 border-t border-white/5">
-                      <div className="flex flex-wrap gap-2 text-xs">
+                      <div className="flex flex-wrap gap-2 text-xs items-center">
                         <a
                           href={`https://dashboard.stripe.com/search?query=${encodeURIComponent(order.stripe_checkout_session_id)}`}
                           target="_blank"
@@ -1923,6 +1935,14 @@ export default function SuperAdminPage() {
                         </a>
                         <span className="text-[var(--c4)]">·</span>
                         <span className="text-[var(--c4)] font-mono select-all">{order.stripe_checkout_session_id}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-[10px] text-[var(--c4)]">
+                        {order.order_confirmation_sent_at && (
+                          <span title={order.order_confirmation_sent_at}>✉️ Confirmation sent</span>
+                        )}
+                        {order.internal_ops_notified_at && (
+                          <span title={order.internal_ops_notified_at}>🔔 Ops notified</span>
+                        )}
                       </div>
 
                       <div className="grid sm:grid-cols-2 gap-4">
@@ -1941,6 +1961,24 @@ export default function SuperAdminPage() {
                             <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-xs text-[var(--c2)] hover:underline">
                               Open tracking link →
                             </a>
+                          )}
+                          {order.order_number && order.order_view_secret && (
+                            <button
+                              type="button"
+                              className="block mt-1 text-xs text-amber-300 hover:underline text-left"
+                              onClick={() => {
+                                const url = `${window.location.origin}/order/${encodeURIComponent(order.order_number!)}?k=${encodeURIComponent(order.order_view_secret!)}`
+                                if (navigator.clipboard?.writeText) {
+                                  navigator.clipboard.writeText(url).catch(() => {
+                                    window.prompt('Copy customer tracking link:', url)
+                                  })
+                                } else {
+                                  window.prompt('Copy customer tracking link:', url)
+                                }
+                              }}
+                            >
+                              Copy customer tracking link
+                            </button>
                           )}
                           {order.shipped_at && <p className="text-xs text-[var(--c4)] mt-1">Shipped: {new Date(order.shipped_at).toLocaleString()}</p>}
                           {order.delivered_at && <p className="text-xs text-[var(--c4)]">Delivered: {new Date(order.delivered_at).toLocaleString()}</p>}
@@ -2012,14 +2050,17 @@ export default function SuperAdminPage() {
                               let carrier: string | null = null
                               let trackingNumber: string | null = null
                               let trackingUrl: string | null = null
-                              let sendShipped = false
 
                               if (selected === 'shipped' && order.fulfillment_status !== 'shipped') {
                                 carrier = window.prompt('Carrier (UPS / FedEx / USPS / DHL):', order.carrier || '') || null
                                 trackingNumber = window.prompt('Tracking number:', order.tracking_number || '') || null
                                 trackingUrl = window.prompt('Tracking URL (optional):', order.tracking_url || '') || null
-                                sendShipped = window.confirm('Send shipping notification email to customer?')
                               }
+
+                              const skipShipEmail =
+                                selected === 'shipped' &&
+                                order.fulfillment_status !== 'shipped' &&
+                                !window.confirm('Send shipping email to customer with tracking? (Cancel = save shipped status but do not email)')
 
                               const response = await fetch('/api/superadmin/orders', {
                                 method: 'POST',
@@ -2033,7 +2074,7 @@ export default function SuperAdminPage() {
                                   tracking_url: trackingUrl,
                                   internal_notes: notes,
                                   assigned_to: assignedTo,
-                                  send_shipped_email: sendShipped,
+                                  send_shipped_email: !skipShipEmail,
                                 }),
                               })
                               const data = await response.json()

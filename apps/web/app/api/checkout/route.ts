@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
@@ -112,9 +113,19 @@ export async function POST(request: NextRequest) {
       })
       const tagCount = getTierTagCount(tier)
 
-      await supabase.from('stripe_orders').upsert(
+      const { data: existingOrder } = await supabase
+        .from('stripe_orders')
+        .select('order_view_secret')
+        .eq('stripe_checkout_session_id', session.id)
+        .maybeSingle()
+
+      const orderViewSecret =
+        (existingOrder?.order_view_secret as string | undefined) || randomUUID()
+
+      let { error: upsertErr } = await supabase.from('stripe_orders').upsert(
         {
           order_number: orderNumber,
+          order_view_secret: orderViewSecret,
           stripe_checkout_session_id: session.id,
           stripe_payment_intent_id: paymentIntentId ?? null,
           customer_email: session.customer_details?.email ?? null,
@@ -130,6 +141,27 @@ export async function POST(request: NextRequest) {
         },
         { onConflict: 'stripe_checkout_session_id' }
       )
+      if (upsertErr && /order_view_secret|column .* does not exist|schema cache/i.test(upsertErr.message || '')) {
+        ;({ error: upsertErr } = await supabase.from('stripe_orders').upsert(
+          {
+            order_number: orderNumber,
+            stripe_checkout_session_id: session.id,
+            stripe_payment_intent_id: paymentIntentId ?? null,
+            customer_email: session.customer_details?.email ?? null,
+            customer_name: session.customer_details?.name ?? null,
+            tier,
+            tag_count: tagCount,
+            amount_total: session.amount_total ?? null,
+            currency: session.currency ?? null,
+            payment_status: session.payment_status ?? 'unpaid',
+            status: 'created',
+            fulfillment_status: 'pending_payment',
+            metadata: session.metadata ?? {},
+          },
+          { onConflict: 'stripe_checkout_session_id' }
+        ))
+      }
+      if (upsertErr) console.warn('Stripe checkout upsert', upsertErr.message)
     } catch (persistError) {
       console.warn('Stripe checkout session persistence warning', persistError)
     }

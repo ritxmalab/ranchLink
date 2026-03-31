@@ -41,6 +41,12 @@ export async function GET(request: NextRequest) {
       tracking_url: row.tracking_url ?? null,
       shipped_at: row.shipped_at ?? null,
       delivered_at: row.delivered_at ?? null,
+      internal_notes: row.internal_notes ?? null,
+      assigned_to: row.assigned_to ?? null,
+      /** Superadmin-only: build customer tracking URL with ?k= */
+      order_view_secret: row.order_view_secret ?? null,
+      order_confirmation_sent_at: row.order_confirmation_sent_at ?? null,
+      internal_ops_notified_at: row.internal_ops_notified_at ?? null,
       created_at: row.created_at,
     }))
 
@@ -79,9 +85,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const orderNumber = String(body?.order_number || '').trim()
     const fulfillmentStatus = String(body?.fulfillment_status || '').trim()
-    const carrier = body?.carrier ? String(body.carrier).trim() : null
-    const trackingNumber = body?.tracking_number ? String(body.tracking_number).trim() : null
-    const trackingUrl = body?.tracking_url ? String(body.tracking_url).trim() : null
+    const carrier = body?.carrier != null ? String(body.carrier).trim() || null : undefined
+    const trackingNumber = body?.tracking_number != null ? String(body.tracking_number).trim() || null : undefined
+    const trackingUrl = body?.tracking_url != null ? String(body.tracking_url).trim() || null : undefined
+    const internalNotes =
+      typeof body?.internal_notes === 'string' ? body.internal_notes.trim() || null : undefined
+    const assignedTo =
+      typeof body?.assigned_to === 'string' ? body.assigned_to.trim() || null : undefined
+    // Default: send customer email when marking shipped (opt out with send_shipped_email: false)
+    const sendShippedEmail = body?.send_shipped_email !== false
+    const packedEmailEnabled = process.env.FULFILLMENT_EMAIL_ON_PACKED === '1'
 
     if (!orderNumber || !fulfillmentStatus) {
       return NextResponse.json(
@@ -102,22 +115,45 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid fulfillment_status' }, { status: 400 })
     }
 
+    const supabase = getSupabaseServerClient()
+
+    const { data: beforeRow, error: beforeErr } = await supabase
+      .from('stripe_orders')
+      .select('fulfillment_status, carrier, tracking_number, tracking_url')
+      .eq('order_number', orderNumber)
+      .single()
+
+    if (beforeErr || !beforeRow) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    const prevStatus = String(beforeRow.fulfillment_status || '')
+
     const updatePayload: Record<string, any> = {
       fulfillment_status: fulfillmentStatus,
-      carrier,
-      tracking_number: trackingNumber,
-      tracking_url: trackingUrl,
       updated_at: new Date().toISOString(),
     }
-    if (fulfillmentStatus === 'shipped') updatePayload.shipped_at = new Date().toISOString()
-    if (fulfillmentStatus === 'delivered') updatePayload.delivered_at = new Date().toISOString()
+    if (internalNotes !== undefined) updatePayload.internal_notes = internalNotes
+    if (assignedTo !== undefined) updatePayload.assigned_to = assignedTo
 
-    const supabase = getSupabaseServerClient()
+    // Only touch carrier/tracking when marking shipped (avoids wiping on "packed" saves)
+    if (fulfillmentStatus === 'shipped') {
+      updatePayload.carrier = carrier !== undefined ? carrier : beforeRow.carrier
+      updatePayload.tracking_number = trackingNumber !== undefined ? trackingNumber : beforeRow.tracking_number
+      updatePayload.tracking_url = trackingUrl !== undefined ? trackingUrl : beforeRow.tracking_url
+      updatePayload.shipped_at = new Date().toISOString()
+    }
+    if (fulfillmentStatus === 'delivered') {
+      updatePayload.delivered_at = new Date().toISOString()
+    }
+
     const { data, error } = await supabase
       .from('stripe_orders')
       .update(updatePayload)
       .eq('order_number', orderNumber)
-      .select('order_number, fulfillment_status, carrier, tracking_number, tracking_url')
+      .select(
+        'order_number, fulfillment_status, carrier, tracking_number, tracking_url, internal_notes, assigned_to'
+      )
       .single()
 
     if (error) {
@@ -125,23 +161,40 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              'Fulfillment columns are not migrated yet. Run ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql in Supabase first.',
+              'Fulfillment or CRM columns missing. Run ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql and 008_STRIPE_ORDERS_INTERNAL_OPS.sql in Supabase.',
           },
           { status: 400 }
         )
       }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    // Send email notification to customer on status changes
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+    const transitionedTo = prevStatus !== fulfillmentStatus
+
     if (data) {
       const { data: order } = await supabase
         .from('stripe_orders')
-        .select('customer_email, customer_name, order_number, tier, tag_count')
+        .select(
+          'customer_email, customer_name, order_number, tier, tag_count, carrier, tracking_number, tracking_url, order_view_secret'
+        )
         .eq('order_number', orderNumber)
         .single()
 
-      if (order?.customer_email) {
+      if (order?.customer_email && transitionedTo) {
+        const c = order.carrier
+        const tn = order.tracking_number
+        const tu = order.tracking_url
+        const sec = (order as { order_view_secret?: string }).order_view_secret
+        const orderPageUrl = sec
+          ? `${appUrl}/order/${encodeURIComponent(orderNumber)}?k=${encodeURIComponent(sec)}`
+          : `${appUrl}/order/${encodeURIComponent(orderNumber)}`
+
+        const sendPacked = fulfillmentStatus === 'packed' && prevStatus !== 'packed'
+        const sendShipped =
+          fulfillmentStatus === 'shipped' && prevStatus !== 'shipped' && sendShippedEmail
+        const sendDelivered = fulfillmentStatus === 'delivered' && prevStatus !== 'delivered'
+
         const statusMessages: Record<string, { subject: string; body: string }> = {
           packed: {
             subject: `Your RanchLink order ${orderNumber} is packed`,
@@ -149,15 +202,26 @@ export async function POST(request: NextRequest) {
           },
           shipped: {
             subject: `Your RanchLink order ${orderNumber} has shipped`,
-            body: `<h2>Your order is on its way!</h2><p>Order: ${orderNumber}</p>${carrier ? `<p>Carrier: ${carrier}</p>` : ''}${trackingUrl ? `<p><a href="${trackingUrl}">Track your package</a></p>` : trackingNumber ? `<p>Tracking: ${trackingNumber}</p>` : ''}<p><a href="${appUrl}/order/${orderNumber}">View order status</a></p>`,
+            body: `<h2>Your order is on its way!</h2><p>Order: ${orderNumber}</p>${c ? `<p>Carrier: ${c}</p>` : ''}${tu ? `<p><a href="${tu}">Track your package</a></p>` : tn ? `<p>Tracking: ${tn}</p>` : ''}<p><a href="${orderPageUrl}">View full order status</a></p>`,
           },
           delivered: {
             subject: `Your RanchLink order ${orderNumber} has been delivered`,
-            body: `<h2>Your tags have arrived!</h2><p>Order: ${orderNumber}</p><p>Ready to get started? Scan a QR tag to register your first animal.</p><p><a href="${appUrl}/start">Claim your tag</a> | <a href="${appUrl}/order/${orderNumber}">View order</a></p>`,
+            body: `<h2>Your tags have arrived!</h2><p>Order: ${orderNumber}</p><p>Ready to get started? Scan a QR tag to register your first animal.</p><p><a href="${appUrl}/start">Claim your tag</a> | <a href="${orderPageUrl}">View order</a></p>`,
           },
         }
-        const msg = statusMessages[fulfillmentStatus]
-        if (msg) {
+
+        if (sendPacked && packedEmailEnabled) {
+          const msg = statusMessages.packed
+          const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0a0a0a;color:#fff;border-radius:12px"><div style="text-align:center;margin-bottom:16px"><h1 style="color:#22d3ee;font-size:20px">RanchLink</h1></div><div style="background:#1f2937;border-radius:8px;padding:20px;margin-bottom:16px">${msg.body}</div><p style="color:#374151;font-size:11px;text-align:center">RanchLink by Ritxma Integrations LLC</p></div>`
+          sendFulfillmentEmail(order.customer_email, msg.subject, html).catch(() => {})
+        }
+        if (sendShipped) {
+          const msg = statusMessages.shipped
+          const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0a0a0a;color:#fff;border-radius:12px"><div style="text-align:center;margin-bottom:16px"><h1 style="color:#22d3ee;font-size:20px">RanchLink</h1></div><div style="background:#1f2937;border-radius:8px;padding:20px;margin-bottom:16px">${msg.body}</div><p style="color:#374151;font-size:11px;text-align:center">RanchLink by Ritxma Integrations LLC</p></div>`
+          sendFulfillmentEmail(order.customer_email, msg.subject, html).catch(() => {})
+        }
+        if (sendDelivered) {
+          const msg = statusMessages.delivered
           const html = `<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#0a0a0a;color:#fff;border-radius:12px"><div style="text-align:center;margin-bottom:16px"><h1 style="color:#22d3ee;font-size:20px">RanchLink</h1></div><div style="background:#1f2937;border-radius:8px;padding:20px;margin-bottom:16px">${msg.body}</div><p style="color:#374151;font-size:11px;text-align:center">RanchLink by Ritxma Integrations LLC</p></div>`
           sendFulfillmentEmail(order.customer_email, msg.subject, html).catch(() => {})
         }

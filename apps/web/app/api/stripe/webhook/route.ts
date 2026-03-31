@@ -119,6 +119,10 @@ export async function POST(request: NextRequest) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session
+  // Stripe types lag Checkout fields — shipping_details exists on completed sessions
+  const sessionShip = session as Stripe.Checkout.Session & {
+    shipping_details?: { name?: string | null; phone?: string | null; address?: Stripe.Address | null }
+  }
   const paymentIntentId =
     typeof session.payment_intent === 'string'
       ? session.payment_intent
@@ -132,7 +136,7 @@ export async function POST(request: NextRequest) {
     checkoutSessionId: session.id,
   })
   // Prefer Checkout shipping address (physical ship-to). Billing-only lives on customer_details.
-  const ship = session.shipping_details
+  const ship = sessionShip.shipping_details
   const shippingAddress = ship?.address ?? session.customer_details?.address ?? null
   const shippingName = ship?.name ?? session.customer_details?.name ?? null
   const shippingPhone = ship?.phone ?? session.customer_details?.phone ?? null
@@ -174,6 +178,13 @@ export async function POST(request: NextRequest) {
       { onConflict: 'stripe_checkout_session_id' }
     )
 
+    if (error && /order_view_secret|column .* does not exist|schema cache/i.test(error.message || '')) {
+      const { order_view_secret: _ignored, ...rest } = enhancedPayload
+      ;({ error } = await supabase.from('stripe_orders').upsert(rest, {
+        onConflict: 'stripe_checkout_session_id',
+      }))
+    }
+
     // Backward-compatible fallback if new fulfillment columns are not migrated yet.
     if (error && /column .* does not exist/i.test(error.message || '')) {
       const legacyPayload = {
@@ -207,18 +218,34 @@ export async function POST(request: NextRequest) {
   }
 
   if (status === 'paid') {
-    // Customer confirmation email
-    if (session.customer_details?.email) {
-      try {
-        const supabase2 = getSupabaseServerClient()
-        const { data: rowForEmail } = await supabase2
-          .from('stripe_orders')
-          .select('order_view_secret')
-          .eq('stripe_checkout_session_id', session.id)
-          .maybeSingle()
-        const secretForEmail =
-          (rowForEmail?.order_view_secret as string | undefined) || randomUUID()
+    const supabaseMail = getSupabaseServerClient()
+    const { data: paidRow } = await supabaseMail
+      .from('stripe_orders')
+      .select('*')
+      .eq('stripe_checkout_session_id', session.id)
+      .maybeSingle()
 
+    if (!paidRow) {
+      console.warn('[webhook] paid session but no stripe_orders row — skip emails', session.id)
+    } else {
+    const row = paidRow as Record<string, unknown>
+    let secretForEmail =
+      (row.order_view_secret as string | undefined) || randomUUID()
+
+    // Persist secret if row exists but secret missing (legacy rows)
+    if (!row.order_view_secret) {
+      await supabaseMail
+        .from('stripe_orders')
+        .update({ order_view_secret: secretForEmail })
+        .eq('stripe_checkout_session_id', session.id)
+    }
+
+    const confirmationAlreadySent = Boolean(row.order_confirmation_sent_at)
+    const opsAlreadyNotified = Boolean(row.internal_ops_notified_at)
+
+    // Customer confirmation (idempotent when migration 009 applied)
+    if (session.customer_details?.email && !confirmationAlreadySent) {
+      try {
         await sendOrderEmail({
           to: session.customer_details.email,
           orderNumber,
@@ -228,26 +255,44 @@ export async function POST(request: NextRequest) {
           tagCount,
           tier,
         })
+        const { error: confErr } = await supabaseMail
+          .from('stripe_orders')
+          .update({ order_confirmation_sent_at: new Date().toISOString() })
+          .eq('stripe_checkout_session_id', session.id)
+        if (confErr && !/order_confirmation_sent_at|does not exist|schema cache/i.test(confErr.message || '')) {
+          console.warn('[webhook] order_confirmation_sent_at update', confErr.message)
+        }
       } catch (emailError) {
         console.warn('Order email warning', emailError)
       }
     }
 
-    // Internal ops notification
-    try {
-      await sendInternalOpsNotification({
-        orderNumber,
-        tier,
-        tagCount,
-        amountTotal: session.amount_total ?? null,
-        currency: session.currency ?? null,
-        customerEmail: session.customer_details?.email ?? null,
-        customerName: session.customer_details?.name ?? shippingName ?? null,
-        shippingPhone,
-        shippingAddress,
-      })
-    } catch (opsErr) {
-      console.warn('Internal ops email warning', opsErr)
+    // Internal ops — ship-to + link to Superadmin + customer private tracking URL
+    if (!opsAlreadyNotified) {
+      try {
+        await sendInternalOpsNotification({
+          orderNumber,
+          orderViewSecret: secretForEmail,
+          tier,
+          tagCount,
+          amountTotal: session.amount_total ?? null,
+          currency: session.currency ?? null,
+          customerEmail: session.customer_details?.email ?? null,
+          customerName: session.customer_details?.name ?? shippingName ?? null,
+          shippingPhone,
+          shippingAddress,
+        })
+        const { error: opsErr } = await supabaseMail
+          .from('stripe_orders')
+          .update({ internal_ops_notified_at: new Date().toISOString() })
+          .eq('stripe_checkout_session_id', session.id)
+        if (opsErr && !/internal_ops_notified_at|does not exist|schema cache/i.test(opsErr.message || '')) {
+          console.warn('[webhook] internal_ops_notified_at update', opsErr.message)
+        }
+      } catch (opsErr) {
+        console.warn('Internal ops email warning', opsErr)
+      }
+    }
     }
   }
 
@@ -256,6 +301,7 @@ export async function POST(request: NextRequest) {
 
 async function sendInternalOpsNotification(params: {
   orderNumber: string
+  orderViewSecret: string
   tier: string | null
   tagCount: number
   amountTotal: number | null
@@ -266,12 +312,24 @@ async function sendInternalOpsNotification(params: {
   shippingAddress: any
 }) {
   const apiKey = process.env.RESEND_API_KEY
-  const from = process.env.ORDER_EMAIL_FROM || process.env.CLAIM_EMAIL_FROM || 'solve@ranchlink.com'
+  const from =
+    process.env.INTERNAL_OPS_EMAIL_FROM ||
+    process.env.ORDER_EMAIL_FROM ||
+    process.env.CLAIM_EMAIL_FROM ||
+    'RanchLink <solve@ranchlink.com>'
   const rawTo = process.env.INTERNAL_OPS_EMAILS || 'solve@ranchlink.com,gonzalo@ritxma.com'
   const to = rawTo.split(',').map((e) => e.trim()).filter(Boolean)
-  if (!apiKey || !to.length) return
+  if (!apiKey) {
+    console.warn('[sendInternalOpsNotification] RESEND_API_KEY missing')
+    return
+  }
+  if (!to.length) {
+    console.warn('[sendInternalOpsNotification] INTERNAL_OPS_EMAILS empty')
+    return
+  }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ranch-link.vercel.app'
+  const customerPrivateUrl = `${appUrl}/order/${encodeURIComponent(params.orderNumber)}?k=${encodeURIComponent(params.orderViewSecret)}`
   const amount =
     params.amountTotal && params.currency
       ? new Intl.NumberFormat('en-US', {
@@ -293,7 +351,7 @@ async function sendInternalOpsNotification(params: {
     body: JSON.stringify({
       from,
       to,
-      subject: `NEW PAID ORDER ${params.orderNumber} — ${params.tier || 'N/A'} (${params.tagCount} tags) $${amount}`,
+      subject: `NEW PAID ORDER ${params.orderNumber} — ${params.tier || 'N/A'} (${params.tagCount} tags) — ${amount}`,
       html: `
         <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111;max-width:600px">
           <h2 style="color:#16a34a">New Paid Order — Action Required</h2>
@@ -307,7 +365,9 @@ async function sendInternalOpsNotification(params: {
             <tr><td style="padding:4px 8px;font-weight:bold">Phone</td><td style="padding:4px 8px">${params.shippingPhone || '—'}</td></tr>
             <tr><td style="padding:4px 8px;font-weight:bold">Ship to</td><td style="padding:4px 8px">${addrLines}</td></tr>
           </table>
-          <p style="margin-top:16px"><a href="${appUrl}/superadmin" style="color:#2563eb;font-weight:bold">Open Superadmin to fulfill →</a></p>
+          <p style="margin-top:16px"><a href="${appUrl}/superadmin" style="color:#2563eb;font-weight:bold">Open Superadmin → Orders tab</a></p>
+          <p style="margin-top:12px;font-size:13px;color:#444"><strong>Customer private tracking link</strong> (resend if they lost email):<br/>
+          <a href="${customerPrivateUrl}" style="word-break:break-all;color:#2563eb">${customerPrivateUrl}</a></p>
         </div>
       `,
     }),

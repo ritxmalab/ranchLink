@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 
 type Order = {
   order_number: string
@@ -13,9 +13,9 @@ type Order = {
   tier: string | null
   tag_count: number
   customer_email: string | null
-  shipping_name: string | null
-  shipping_phone: string | null
-  shipping_address_json: Record<string, string> | null
+  shipping_name?: string | null
+  shipping_phone?: string | null
+  shipping_address_json?: Record<string, string> | null
   carrier: string | null
   tracking_number: string | null
   tracking_url: string | null
@@ -34,8 +34,11 @@ function formatAmount(amountTotal: number | null, currency: string | null): stri
 
 export default function OrderPage() {
   const params = useParams<{ order_number: string }>()
+  const searchParams = useSearchParams()
   const orderNumber = params?.order_number || ''
+  const secretK = searchParams.get('k') || ''
   const [order, setOrder] = useState<Order | null>(null)
+  const [access, setAccess] = useState<'full' | 'summary' | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,10 +51,14 @@ export default function OrderPage() {
         return
       }
       try {
-        const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`)
+        const q = secretK ? `?k=${encodeURIComponent(secretK)}` : ''
+        const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}${q}`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Order not found')
-        if (!cancelled) setOrder(data.order)
+        if (!cancelled) {
+          setOrder(data.order)
+          setAccess(data.access ?? null)
+        }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Unable to load order')
       } finally {
@@ -61,7 +68,7 @@ export default function OrderPage() {
     return () => {
       cancelled = true
     }
-  }, [orderNumber])
+  }, [orderNumber, secretK])
 
   return (
     <main className="min-h-screen bg-[var(--bg)] py-10 px-4">
@@ -80,12 +87,23 @@ export default function OrderPage() {
 
         {!loading && order && (
           <div className="space-y-6">
+            {access === 'summary' && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-900/10 p-4 text-amber-100 text-sm">
+                Showing a public summary. Open the link from your confirmation email (includes <span className="font-mono">?k=…</span>) to see full shipping and contact details.
+              </div>
+            )}
+
             <section className="rounded-lg border border-white/10 bg-[var(--bg-card)] p-4">
               <h2 className="font-semibold mb-3">Purchase</h2>
               <p><span className="text-[var(--c4)]">Total:</span> {formatAmount(order.amount_total, order.currency)}</p>
               <p><span className="text-[var(--c4)]">Tier:</span> {order.tier || 'N/A'}</p>
               <p><span className="text-[var(--c4)]">Tag quantity:</span> {order.tag_count}</p>
-              <p><span className="text-[var(--c4)]">Email:</span> {order.customer_email || 'N/A'}</p>
+              {access === 'full' && (
+                <p><span className="text-[var(--c4)]">Email:</span> {order.customer_email || 'N/A'}</p>
+              )}
+              {access === 'summary' && order.customer_email && (
+                <p><span className="text-[var(--c4)]">Email:</span> {order.customer_email}</p>
+              )}
             </section>
 
             <section className="rounded-lg border border-white/10 bg-[var(--bg-card)] p-4">
@@ -97,21 +115,38 @@ export default function OrderPage() {
               {order.delivered_at && <p><span className="text-[var(--c4)]">Delivered:</span> {new Date(order.delivered_at).toLocaleString()}</p>}
             </section>
 
-            <section className="rounded-lg border border-white/10 bg-[var(--bg-card)] p-4">
-              <h2 className="font-semibold mb-3">Delivery</h2>
-              <p><span className="text-[var(--c4)]">Recipient:</span> {order.shipping_name || 'Pending'}</p>
-              <p><span className="text-[var(--c4)]">Phone:</span> {order.shipping_phone || 'Pending'}</p>
-              <p><span className="text-[var(--c4)]">Address:</span> {order.shipping_address_json ? JSON.stringify(order.shipping_address_json) : 'Pending'}</p>
-              <p><span className="text-[var(--c4)]">Carrier:</span> {order.carrier || 'Pending'}</p>
-              <p><span className="text-[var(--c4)]">Tracking:</span> {order.tracking_number || 'Pending'}</p>
-              {order.tracking_url && (
-                <p>
-                  <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-[var(--c2)] hover:underline">
-                    Open tracking link
-                  </a>
-                </p>
-              )}
-            </section>
+            {access === 'full' && (
+              <section className="rounded-lg border border-white/10 bg-[var(--bg-card)] p-4">
+                <h2 className="font-semibold mb-3">Delivery</h2>
+                <p><span className="text-[var(--c4)]">Recipient:</span> {order.shipping_name || 'Pending'}</p>
+                <p><span className="text-[var(--c4)]">Phone:</span> {order.shipping_phone || 'Pending'}</p>
+                <p><span className="text-[var(--c4)]">Address:</span> {order.shipping_address_json ? JSON.stringify(order.shipping_address_json) : 'Pending'}</p>
+                <p><span className="text-[var(--c4)]">Carrier:</span> {order.carrier || 'Pending'}</p>
+                <p><span className="text-[var(--c4)]">Tracking:</span> {order.tracking_number || 'Pending'}</p>
+                {order.tracking_url && (
+                  <p>
+                    <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-[var(--c2)] hover:underline">
+                      Open tracking link
+                    </a>
+                  </p>
+                )}
+              </section>
+            )}
+
+            {access === 'summary' && (
+              <section className="rounded-lg border border-white/10 bg-[var(--bg-card)] p-4">
+                <h2 className="font-semibold mb-3">Shipment</h2>
+                <p><span className="text-[var(--c4)]">Carrier:</span> {order.carrier || 'Pending'}</p>
+                <p><span className="text-[var(--c4)]">Tracking:</span> {order.tracking_number || 'Pending'}</p>
+                {order.tracking_url && (
+                  <p>
+                    <a href={order.tracking_url} target="_blank" rel="noreferrer" className="text-[var(--c2)] hover:underline">
+                      Open tracking link
+                    </a>
+                  </p>
+                )}
+              </section>
+            )}
           </div>
         )}
 

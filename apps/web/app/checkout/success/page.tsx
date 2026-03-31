@@ -7,6 +7,7 @@ type OrderLookup = {
   order_number: string | null
   payment_status: string
   fulfillment_status: string
+  order_view_secret?: string | null
 }
 
 export default function CheckoutSuccessPage() {
@@ -75,7 +76,14 @@ export default function CheckoutSuccessPage() {
 
         <div className="mt-6 flex flex-wrap gap-3">
           {order?.order_number && (
-            <a href={`/order/${encodeURIComponent(order.order_number)}`} className="btn-primary">
+            <a
+              href={
+                order.order_view_secret
+                  ? `/order/${encodeURIComponent(order.order_number)}?k=${encodeURIComponent(order.order_view_secret)}`
+                  : `/order/${encodeURIComponent(order.order_number)}`
+              }
+              className="btn-primary"
+            >
               Track this order
             </a>
           )}

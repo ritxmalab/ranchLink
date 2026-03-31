@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-24 (session 7 — full auth, ranch dashboard, purchase flow, security) | **Build:** TBD | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-31 (session 8 — Stripe fulfillment pipeline, `order_view_secret`, webhook idempotency, Superadmin ops UX) | **Build:** TBD | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -516,6 +516,36 @@ Until created, these products will fall through to `mailto:solve@ritxma.com` (gr
 | **Rancher (Admin)** | Their ranch only: animals, events, health, genetics, costs, analytics, wallet, export | `/ranch` with email + PIN (e.g. gonzalobame@gmail.com) |
 | **Public** | View animal cards (`/a/[public_id]`), browse store, order tracking | No login needed |
 
+---
+
+## 18. Session 8 — Internal commerce & fulfillment (2026-03-31)
+
+### Goal
+Paid customers trigger **internal** attention (no external CRM): ops email + Superadmin **Orders** tab with full ship-to, notes, assignment, and safe customer tracking links.
+
+### Supabase SQL (run in order if not already applied)
+| Migration | Purpose |
+|-----------|---------|
+| `ADD_STRIPE_ORDER_FULFILLMENT_FIELDS.sql` | `order_number`, shipping, carrier, tracking, `shipped_at`, etc. |
+| `008_STRIPE_ORDERS_INTERNAL_OPS.sql` | `internal_notes`, `assigned_to` |
+| `009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY.sql` | `order_confirmation_sent_at`, `internal_ops_notified_at` (no duplicate emails on Stripe retries) |
+| `010_ORDER_VIEW_SECRET.sql` | `order_view_secret` UUID + backfill |
+
+### Env (Vercel + `.env.local`)
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — endpoint: `https://ranch-link.vercel.app/api/stripe/webhook`
+- `RESEND_API_KEY`, `ORDER_EMAIL_FROM` (e.g. `RanchLink <solve@ranchlink.com>`)
+- `INTERNAL_OPS_EMAILS` — comma-separated; each **new paid** order emails here with ship-to + **customer private link** (`/order/...?k=`)
+
+### Code behavior (this session)
+- **Checkout** persists `order_view_secret` (retries upsert without column if DB old).
+- **Webhook** on paid: idempotent customer + internal ops emails; internal body includes copy-paste customer tracking URL.
+- **GET `/api/orders/[order_number]`**: correct `?k=` → full ship-to + email; else summary + masked email.
+- **Superadmin Orders**: copy customer link, confirmation/ops-sent badges, shipped save → confirm customer email (Cancel = skip email).
+- **Fulfillment emails** to customer: order page links use `?k=` when stored.
+
+### Files touched
+- `apps/web/app/api/checkout/route.ts`, `stripe/webhook/route.ts`, `orders/[order_number]/route.ts`, `orders/session/[session_id]/route.ts`, `superadmin/orders/route.ts`, `superadmin/page.tsx`, `checkout/success/page.tsx`, `order/[order_number]/page.tsx`, `supabase/migrations/010_ORDER_VIEW_SECRET.sql`
+
 ### Revenue Model (architecture supports)
 - Tag sales on store → subscription gateway
 - Label batch sales
@@ -523,3 +553,12 @@ Until created, these products will fall through to `mailto:solve@ritxma.com` (gr
 - RWA marketplace (future: sell animals)
 - Non-custodial wallet conversion (future: fee-based)
 - Asset transfer to external wallet (future: fee-based)
+
+---
+
+## 19. 2026-03-31 — Internal fulfillment & env knobs
+
+- **Superadmin → Orders tab** is the internal fulfillment pipeline: expand a row for ship-to, carrier/tracking, status transitions (packed / shipped / delivered), and internal notes.
+- **INTERNAL_OPS_EMAILS** drives Resend notifications on each new paid checkout (Stripe webhook); **migration 009** adds `order_confirmation_sent_at` and `internal_ops_notified_at` so webhook retries do not duplicate customer confirmation or ops emails.
+- **Customer private tracking** uses `/order/{order_number}?k={order_view_secret}`; ops can copy that link from the expanded row (Ship to section) for resends.
+- **Env:** `INTERNAL_OPS_EMAIL_FROM` (optional From for ops mail), `FULFILLMENT_EMAIL_ON_PACKED=1` (optional; packed-state customer email is off unless set), plus existing `RESEND_API_KEY`, `ORDER_EMAIL_FROM`, `CLAIM_EMAIL_FROM`, `INTERNAL_OPS_EMAILS`.

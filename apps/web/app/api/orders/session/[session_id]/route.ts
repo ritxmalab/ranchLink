@@ -24,6 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
+    const d = data as Record<string, unknown>
     return NextResponse.json({
       order: {
         order_number: data.order_number || null,
@@ -34,8 +35,8 @@ export async function GET(
         amount_total: data.amount_total ?? null,
         currency: data.currency ?? null,
         tag_count: data.tag_count ?? 0,
-        customer_email: data.customer_email ?? null,
         created_at: data.created_at,
+        order_view_secret: (d.order_view_secret as string | undefined) ?? null,
       },
     })
   } catch (error: any) {
