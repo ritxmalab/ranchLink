@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 type OrderLookup = {
@@ -10,7 +10,7 @@ type OrderLookup = {
   order_view_secret?: string | null
 }
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [order, setOrder] = useState<OrderLookup | null>(null)
@@ -93,5 +93,21 @@ export default function CheckoutSuccessPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[var(--bg)] py-10 px-4">
+          <div className="max-w-2xl mx-auto card">
+            <p className="text-[var(--c4)]">Loading...</p>
+          </div>
+        </main>
+      }
+    >
+      <CheckoutSuccessContent />
+    </Suspense>
   )
 }

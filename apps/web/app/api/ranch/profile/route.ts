@@ -76,34 +76,35 @@ export async function PATCH(request: NextRequest) {
     const { ranch_name, user_name, phone } = patchSchema.parse(body)
 
     const supabase = getSupabaseServerClient()
-    const updates: Promise<any>[] = []
 
-    if (ranch_name) {
-      updates.push(
-        supabase
-          .from('ranches')
-          .update({ name: ranch_name })
-          .eq('id', session.ranchId)
-      )
-    }
-
-    if (user_name || phone !== undefined) {
-      const userUpdate: Record<string, string> = {}
-      if (user_name) userUpdate.name = user_name
-      if (phone !== undefined) userUpdate.phone = phone
-      updates.push(
-        supabase
-          .from('ranch_users')
-          .update(userUpdate)
-          .eq('id', session.userId)
-      )
-    }
-
-    if (updates.length === 0) {
+    if (!ranch_name && user_name === undefined && phone === undefined) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    await Promise.all(updates)
+    if (ranch_name) {
+      const { error: ranchErr } = await supabase
+        .from('ranches')
+        .update({ name: ranch_name })
+        .eq('id', session.ranchId)
+      if (ranchErr) {
+        console.error('[RANCH] profile ranch update:', ranchErr)
+        return NextResponse.json({ error: 'Failed to update ranch' }, { status: 500 })
+      }
+    }
+
+    if (user_name !== undefined || phone !== undefined) {
+      const userUpdate: Record<string, string> = {}
+      if (user_name) userUpdate.name = user_name
+      if (phone !== undefined) userUpdate.phone = phone
+      const { error: userErr } = await supabase
+        .from('ranch_users')
+        .update(userUpdate)
+        .eq('id', session.userId)
+      if (userErr) {
+        console.error('[RANCH] profile user update:', userErr)
+        return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (e) {

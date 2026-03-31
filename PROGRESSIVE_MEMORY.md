@@ -1,5 +1,5 @@
 # RanchLink — Progressive Memory
-**Last updated:** 2026-03-31 (session 8 — Stripe fulfillment pipeline, `order_view_secret`, webhook idempotency, Superadmin ops UX) | **Build:** TBD | **Live:** https://ranch-link.vercel.app
+**Last updated:** 2026-03-31 (session 8 — commerce + fulfillment; build verified) | **Build:** `npm run build` OK | **Live:** https://ranch-link.vercel.app
 
 ---
 
@@ -11,7 +11,7 @@ RanchLink is a blockchain-linked cattle tag system. Physical 3D-printed tags (PE
 - An **ERC-1155 NFT** on Base Mainnet via lazy minting (Merkle tree / `anchorBatch`)
 - A **Supabase** backend (project: `utovzxpmfnzihurotqnv`)
 
-**Stack:** Next.js 15 (App Router) · TypeScript · Tailwind · Supabase · Viem · Base Mainnet · Pinata IPFS · Vercel
+**Stack:** Next.js 14 (App Router) · TypeScript · Tailwind · Supabase · Viem · Base Mainnet · Pinata IPFS · Vercel
 
 ---
 
@@ -538,13 +538,15 @@ Paid customers trigger **internal** attention (no external CRM): ops email + Sup
 
 ### Code behavior (this session)
 - **Checkout** persists `order_view_secret` (retries upsert without column if DB old).
-- **Webhook** on paid: idempotent customer + internal ops emails; internal body includes copy-paste customer tracking URL.
+- **Webhook** on paid: idempotent customer + internal ops emails; internal body includes copy-paste customer tracking URL; upsert retry omits `order_view_secret` if the column is missing.
 - **GET `/api/orders/[order_number]`**: correct `?k=` → full ship-to + email; else summary + masked email.
 - **Superadmin Orders**: copy customer link, confirmation/ops-sent badges, shipped save → confirm customer email (Cancel = skip email).
 - **Fulfillment emails** to customer: order page links use `?k=` when stored.
+- **Client pages** using `useSearchParams` (`/checkout/success`, `/order/[order_number]`) wrap content in `<Suspense>` so production `next build` succeeds.
+- **PATCH `/api/ranch/profile`**: sequential `await` on Supabase update chains (correct Promise typing for `tsc`).
 
 ### Files touched
-- `apps/web/app/api/checkout/route.ts`, `stripe/webhook/route.ts`, `orders/[order_number]/route.ts`, `orders/session/[session_id]/route.ts`, `superadmin/orders/route.ts`, `superadmin/page.tsx`, `checkout/success/page.tsx`, `order/[order_number]/page.tsx`, `supabase/migrations/010_ORDER_VIEW_SECRET.sql`
+- `apps/web/app/api/checkout/route.ts`, `stripe/webhook/route.ts`, `orders/[order_number]/route.ts`, `orders/session/[session_id]/route.ts`, `superadmin/orders/route.ts`, `superadmin/page.tsx`, `checkout/success/page.tsx`, `order/[order_number]/page.tsx`, `ranch/profile/route.ts`, `supabase/migrations/008_STRIPE_ORDERS_INTERNAL_OPS.sql`, `009_STRIPE_WEBHOOK_EMAIL_IDEMPOTENCY.sql`, `010_ORDER_VIEW_SECRET.sql`
 
 ### Revenue Model (architecture supports)
 - Tag sales on store → subscription gateway

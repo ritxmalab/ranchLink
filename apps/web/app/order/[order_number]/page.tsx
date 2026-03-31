@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 
 type Order = {
@@ -32,7 +32,7 @@ function formatAmount(amountTotal: number | null, currency: string | null): stri
   }).format(amountTotal / 100)
 }
 
-export default function OrderPage() {
+function OrderPageContent() {
   const params = useParams<{ order_number: string }>()
   const searchParams = useSearchParams()
   const orderNumber = params?.order_number || ''
@@ -155,5 +155,21 @@ export default function OrderPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function OrderPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[var(--bg)] py-10 px-4">
+          <div className="max-w-2xl mx-auto card">
+            <p className="text-[var(--c4)]">Loading order...</p>
+          </div>
+        </main>
+      }
+    >
+      <OrderPageContent />
+    </Suspense>
   )
 }
