@@ -49,7 +49,8 @@ export async function GET(
         chain,
         contract_address,
         status,
-        activation_state
+        activation_state,
+        owner_user_id
       ),
       ranches (
         id,
@@ -90,6 +91,16 @@ export async function GET(
 
     if (error || !animal) {
       return NextResponse.json({ error: 'Animal not found' }, { status: 404 })
+    }
+
+    // Ownership state is exposed to the public card as a boolean; the owner's
+    // user id itself stays admin-only.
+    if (Array.isArray(animal.tags)) {
+      animal.tags = animal.tags.map((tag: Record<string, any>) => {
+        const withFlag: Record<string, any> = { ...tag, has_owner: !!tag.owner_user_id }
+        if (!isAdmin) delete withFlag.owner_user_id
+        return withFlag
+      })
     }
 
     // Get animal events (ongoing updates log)

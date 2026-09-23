@@ -4,12 +4,11 @@ import { rateLimit } from '@/lib/rate-limit'
 import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 import { timingSafeEqualString, validateSession } from '@/lib/ranch-auth'
 
-async function linkPhotoToAnimal(
+async function authorizePhotoLink(
   request: NextRequest,
   publicId: string,
-  photoUrl: string,
   claimToken: string | null
-): Promise<boolean> {
+): Promise<string | null> {
   const supabase = getSupabaseServerClient()
 
   const { data: animal } = await supabase
@@ -18,7 +17,7 @@ async function linkPhotoToAnimal(
     .eq('public_id', publicId)
     .single()
 
-  if (!animal) return false
+  if (!animal) return null
 
   let authorized = isSuperadminAuthenticated(request)
 
@@ -51,10 +50,9 @@ async function linkPhotoToAnimal(
       (!!tagClaimToken && !!claimToken && timingSafeEqualString(claimToken, tagClaimToken))
   }
 
-  if (!authorized) return false
+  if (!authorized) return null
 
-  await supabase.from('animals').update({ photo_url: photoUrl }).eq('id', (animal as any).id)
-  return true
+  return (animal as any).id as string
 }
 
 /**
@@ -87,6 +85,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large. Maximum 10MB.' }, { status: 400 })
     }
 
+    // Authorize before pinning so an unauthorized caller cannot consume paid
+    // Pinata storage. Uploads with no public_id happen during attach, before
+    // the animal exists, and stay anonymous behind the rate limiter.
+    let animalId: string | null = null
+    if (publicId) {
+      animalId = await authorizePhotoLink(request, publicId, claimToken)
+      if (!animalId) {
+        return NextResponse.json({ error: 'Not authorized to update this animal' }, { status: 403 })
+      }
+    }
+
     const jwt = process.env.PINATA_JWT
     if (!jwt) {
       return NextResponse.json({ error: 'PINATA_JWT not configured' }, { status: 500 })
@@ -116,11 +125,13 @@ export async function POST(request: NextRequest) {
     const cid = pinataData.IpfsHash
     const photoUrl = `https://gateway.pinata.cloud/ipfs/${cid}`
 
-    // If public_id provided, update the animal record — owner-gated so an
-    // anonymous caller cannot overwrite photos on animals they do not own.
     let linked = false
-    if (publicId) {
-      linked = await linkPhotoToAnimal(request, publicId, photoUrl, claimToken)
+    if (animalId) {
+      const { error: linkError } = await getSupabaseServerClient()
+        .from('animals')
+        .update({ photo_url: photoUrl })
+        .eq('id', animalId)
+      linked = !linkError
     }
 
     return NextResponse.json({ success: true, cid, photo_url: photoUrl, linked })

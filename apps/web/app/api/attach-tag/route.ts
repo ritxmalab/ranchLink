@@ -104,7 +104,9 @@ export async function POST(request: NextRequest) {
     // 2. Tag must be in a valid state
     // v2.0: pre_identity tags (Merkle-anchored) are valid — they lazy-mint at attach time
     // v1.0: on_chain_unclaimed tags (already minted ERC-721) are valid
-    const validStatuses = ['on_chain_unclaimed', 'pre_identity', 'assembled', 'in_inventory']
+    // 'shipped' is the state a tag is in when it reaches the farmer, so it is
+    // the normal starting point for a scan.
+    const validStatuses = ['on_chain_unclaimed', 'pre_identity', 'assembled', 'shipped', 'in_inventory']
     if (!validStatuses.includes(tag.status)) {
       return NextResponse.json(
         {

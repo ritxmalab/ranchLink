@@ -44,7 +44,8 @@ interface Animal {
     contract_address: string | null
     status: string
     activation_state: string
-    owner_user_id: string | null
+    owner_user_id?: string | null
+    has_owner?: boolean
   }>
   ranches?: {
     id: string
@@ -146,7 +147,7 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
     setIsOwner(cookieOwner || sessionOwner)
 
     const tag = animal.tags?.[0]
-    setNeedsIdentity(!!tag && !tag.owner_user_id)
+    setNeedsIdentity(!!tag && !tag.has_owner)
   }, [animal, sessionRanchId, public_id])
 
   const fetchAnimal = async () => {
