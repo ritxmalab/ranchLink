@@ -27,7 +27,7 @@ alwaysApply: true
 | Animal card URL | `/a/[public_id]` (format: AUS0001, AUS0002...) |
 | Tag code format | RL-001, RL-002... |
 | Superadmin URL | `/superadmin` — password via SUPERADMIN_PASSWORD env var |
-| Superadmin password | `ranchlink2026` (set in Vercel env) |
+| Superadmin password | `<REDACTED_SUPERADMIN_PASSWORD — rotated>` (set in Vercel env) |
 
 ---
 
@@ -196,7 +196,7 @@ target_ranch_id, status, created_at
 | `NEXT_PUBLIC_ALCHEMY_BASE_RPC` | Alchemy Base Mainnet RPC |
 | `PINATA_JWT` | Set in Vercel ✅ |
 | `SUPABASE_SERVICE_KEY` | Set in Vercel ✅ |
-| `SUPERADMIN_PASSWORD` | `ranchlink2026` |
+| `SUPERADMIN_PASSWORD` | `<REDACTED_SUPERADMIN_PASSWORD — rotated>` |
 
 ---
 

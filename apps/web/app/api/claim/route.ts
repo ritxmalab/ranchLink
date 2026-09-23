@@ -1,19 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { pinAnimalMetadata } from '@/lib/ipfs/client'
-import { CONTRACTS, currentChain } from '@/lib/blockchain/config'
-import { createWalletClient, http, parseEther } from 'viem'
-import { privateKeyToAccount } from 'viem/accounts'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
 
-// POST /api/claim - Claim a tag with token
+export const dynamic = 'force-dynamic'
+
+// Superseded by the /t/[tag_code] attach flow. Kept reachable only when
+// ENABLE_LEGACY_CLAIM_API is explicitly set, so it cannot be used to create
+// owner/animal records anonymously in production.
+const LEGACY_CLAIM_ENABLED = process.env.ENABLE_LEGACY_CLAIM_API === 'true'
+
+const claimSchema = z.object({
+  token: z.string().min(1).max(200),
+  email: z.string().email().max(255).optional(),
+  phone: z.string().max(30).optional(),
+  basename: z.string().max(200).optional(),
+  animalName: z.string().max(100).optional(),
+  species: z.string().max(50).optional(),
+  breed: z.string().max(100).optional(),
+  birthYear: z.number().int().min(1900).max(2100).optional(),
+})
+
+// POST /api/claim - Claim a tag with token (legacy)
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { token, email, phone, basename, animalName, species, breed, birthYear } = body
+  if (!LEGACY_CLAIM_ENABLED) {
+    return NextResponse.json(
+      { error: 'This endpoint is retired. Use /t/[tag_code] instead.' },
+      { status: 410 }
+    )
+  }
 
-    if (!token) {
-      return NextResponse.json({ error: 'Token required' }, { status: 400 })
+  if (!rateLimit(request, 5, 60000)) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+  }
+
+  try {
+    let parsed: z.infer<typeof claimSchema>
+    try {
+      parsed = claimSchema.parse(await request.json())
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return NextResponse.json({ error: 'Invalid request body', details: e.errors }, { status: 400 })
+      }
+      throw e
     }
+    const { token, email, phone, basename, animalName, species, breed, birthYear } = parsed
 
     const supabase = getSupabaseServerClient()
 

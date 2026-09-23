@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
 import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
+import { timingSafeEqualString, validateSession } from '@/lib/ranch-auth'
 import { z } from 'zod'
 
 export const maxDuration = 60 // setCID on-chain call can take 10-30s
@@ -87,24 +88,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Animal not found' }, { status: 404 })
     }
 
-    // Ownership check — authenticated superadmin session bypasses claim-token check.
+    // Ownership check — superadmin session, ranch session owning the tag, or the
+    // claim token handed out at attach time. Fails closed when none match.
     const isSuperadmin = isSuperadminAuthenticated(request)
     if (!isSuperadmin) {
-      // Fetch claim_token from tags table separately (column may not exist yet)
-      const tag = Array.isArray(animal.tags) ? animal.tags[0] : animal.tags as any
+      const tag = Array.isArray(animal.tags) ? animal.tags[0] : (animal.tags as any)
       let tagClaimToken: string | null = null
+      let tagOwnerUserId: string | null = null
+      let tagRanchId: string | null = null
       if (tag?.id) {
         const { data: tagRow } = await supabase
           .from('tags')
-          .select('claim_token')
+          .select('claim_token, owner_user_id, ranch_id')
           .eq('id', tag.id)
           .single()
         tagClaimToken = (tagRow as any)?.claim_token ?? null
+        tagOwnerUserId = (tagRow as any)?.owner_user_id ?? null
+        tagRanchId = (tagRow as any)?.ranch_id ?? null
       }
-      // If claim_token column doesn't exist yet (null) and a claim_token was provided,
-      // allow the update — the column migration is pending. Once migrated, this tightens.
-      if (tagClaimToken !== null && (!claim_token || claim_token !== tagClaimToken)) {
-        return NextResponse.json({ error: 'Unauthorized', message: 'Only the tag owner can update this animal' }, { status: 403 })
+
+      const session = await validateSession(request)
+      const sessionOwnsTag =
+        !!session &&
+        ((!!tagOwnerUserId && tagOwnerUserId === session.userId) ||
+          (!!tagRanchId && tagRanchId === session.ranchId))
+
+      const tokenMatches =
+        !!tagClaimToken && !!claim_token && timingSafeEqualString(claim_token, tagClaimToken)
+
+      if (!sessionOwnsTag && !tokenMatches) {
+        return NextResponse.json(
+          { error: 'Unauthorized', message: 'Only the tag owner can update this animal' },
+          { status: 403 }
+        )
       }
     }
 

@@ -24,7 +24,9 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    const d = data as Record<string, unknown>
+    // NOTE: order_view_secret is deliberately not returned — it is the bearer
+    // credential for the private order link and a checkout session id must not
+    // be enough to obtain it.
     return NextResponse.json({
       order: {
         order_number: data.order_number || null,
@@ -36,7 +38,6 @@ export async function GET(
         currency: data.currency ?? null,
         tag_count: data.tag_count ?? 0,
         created_at: data.created_at,
-        order_view_secret: (d.order_view_secret as string | undefined) ?? null,
       },
     })
   } catch (error: any) {

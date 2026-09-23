@@ -5,10 +5,17 @@ import crypto from 'crypto'
 const SESSION_COOKIE = 'rl_session'
 const SESSION_TTL = 30 * 24 * 60 * 60 // 30 days
 
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 // ── OTP ─────────────────────────────────────────────────────────────────────
 
 export function generateOTP(): string {
-  return String(Math.floor(100000 + Math.random() * 900000))
+  return String(crypto.randomInt(100000, 1000000))
 }
 
 export function generateSessionToken(): string {
@@ -18,7 +25,11 @@ export function generateSessionToken(): string {
 // ── Wallet encryption (AES-256-GCM) ─────────────────────────────────────────
 
 function getEncryptionKey(): Buffer {
-  const secret = process.env.WALLET_ENCRYPTION_KEY || process.env.SUPERADMIN_SESSION_SECRET || ''
+  // Custodial keys must not be encrypted under a secret that also signs admin
+  // sessions: reusing it means one leak compromises both.
+  const secret =
+    process.env.WALLET_ENCRYPTION_KEY ||
+    (process.env.NODE_ENV === 'production' ? '' : process.env.SUPERADMIN_SESSION_SECRET || '')
   if (secret.length < 16) throw new Error('WALLET_ENCRYPTION_KEY must be at least 16 chars')
   return crypto.scryptSync(secret, 'ranchlink-wallet-salt', 32)
 }
@@ -32,12 +43,28 @@ export function encryptPrivateKey(privateKey: string): string {
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`
 }
 
-export function decryptPrivateKey(encryptedData: string): string {
-  const [ivHex, tagHex, dataHex] = encryptedData.split(':')
-  const key = getEncryptionKey()
+function decryptWith(key: Buffer, ivHex: string, tagHex: string, dataHex: string): string {
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'))
   decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
   return decipher.update(dataHex, 'hex', 'utf8') + decipher.final('utf8')
+}
+
+export function decryptPrivateKey(encryptedData: string): string {
+  const [ivHex, tagHex, dataHex] = encryptedData.split(':')
+  try {
+    return decryptWith(getEncryptionKey(), ivHex, tagHex, dataHex)
+  } catch (err) {
+    // Wallets created before WALLET_ENCRYPTION_KEY existed were encrypted under
+    // the admin session secret; keep them readable so custody is not lost.
+    const legacy = process.env.SUPERADMIN_SESSION_SECRET || ''
+    if (legacy.length < 16) throw err
+    return decryptWith(
+      crypto.scryptSync(legacy, 'ranchlink-wallet-salt', 32),
+      ivHex,
+      tagHex,
+      dataHex
+    )
+  }
 }
 
 // ── EOA Wallet generation (viem, NOT CDP smart wallets) ─────────────────────
@@ -187,8 +214,16 @@ export async function verifyCode(email: string, code: string, purpose: string = 
   if (error || !data) return false
   if (data.attempts >= data.max_attempts) return false
 
-  await supabase.from('verification_codes').update({ used_at: new Date().toISOString() }).eq('id', data.id)
-  return true
+  // Consume the code conditionally: concurrent verifications of the same code
+  // must not both succeed.
+  const { data: consumed } = await supabase
+    .from('verification_codes')
+    .update({ used_at: new Date().toISOString() })
+    .eq('id', data.id)
+    .is('used_at', null)
+    .select('id')
+
+  return !!consumed && consumed.length > 0
 }
 
 export async function incrementAttempts(email: string, purpose: string = 'claim'): Promise<void> {
@@ -290,12 +325,18 @@ export async function findOrCreateRanchUser(
 
 // ── Sessions ────────────────────────────────────────────────────────────────
 
+// Sessions are stored as SHA-256 digests: a leaked database snapshot or a
+// service-role read must not yield usable session cookies.
+export function hashSessionToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
 export async function createSession(userId: string): Promise<string> {
   const supabase = getSupabaseServerClient()
   const token = generateSessionToken()
   await supabase.from('ranch_sessions').insert({
     user_id: userId,
-    session_token: token,
+    session_token: hashSessionToken(token),
     expires_at: new Date(Date.now() + SESSION_TTL * 1000).toISOString(),
   })
   return token
@@ -311,7 +352,7 @@ export async function validateSession(request: NextRequest): Promise<{
   const { data: session } = await supabase
     .from('ranch_sessions')
     .select('user_id, expires_at')
-    .eq('session_token', token)
+    .eq('session_token', hashSessionToken(token))
     .gt('expires_at', new Date().toISOString())
     .single()
 
@@ -357,8 +398,15 @@ export const SESSION_COOKIE_NAME = SESSION_COOKIE
 
 // ── Finalize-claim token (for retroactive identity on existing tags) ────────
 
+function getFinalizeSecret(): string {
+  const secret = process.env.SUPERADMIN_SESSION_SECRET || ''
+  if (secret) return secret
+  // Never derive link-signing material from the admin password in production.
+  return process.env.NODE_ENV === 'production' ? '' : process.env.SUPERADMIN_PASSWORD || ''
+}
+
 export function generateFinalizeToken(tagCode: string, publicId: string): string {
-  const secret = process.env.SUPERADMIN_SESSION_SECRET || process.env.SUPERADMIN_PASSWORD || ''
+  const secret = getFinalizeSecret()
   const payload = `${tagCode}:${publicId}:${Date.now()}`
   const hmac = crypto.createHmac('sha256', secret).update(payload).digest('hex').slice(0, 16)
   return Buffer.from(`${payload}:${hmac}`).toString('base64url')
@@ -370,9 +418,10 @@ export function verifyFinalizeToken(token: string): { tagCode: string; publicId:
     const parts = decoded.split(':')
     if (parts.length < 4) return null
     const [tagCode, publicId, ts, hmac] = parts
-    const secret = process.env.SUPERADMIN_SESSION_SECRET || process.env.SUPERADMIN_PASSWORD || ''
+    const secret = getFinalizeSecret()
     const expected = crypto.createHmac('sha256', secret).update(`${tagCode}:${publicId}:${ts}`).digest('hex').slice(0, 16)
-    if (hmac !== expected) return null
+    if (!secret) return null
+    if (!timingSafeEqualString(hmac, expected)) return null
     // Token valid for 30 days
     if (Date.now() - parseInt(ts) > 30 * 24 * 60 * 60 * 1000) return null
     return { tagCode, publicId }

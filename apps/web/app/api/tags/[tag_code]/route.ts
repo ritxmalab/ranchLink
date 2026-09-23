@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
 
 export const dynamic = 'force-dynamic'
+
+// Public projection — never expose claim_token, owner_user_id or other secrets.
+const PUBLIC_TAG_FIELDS = [
+  'id',
+  'tag_code',
+  'chain',
+  'contract_address',
+  'token_id',
+  'mint_tx_hash',
+  'status',
+  'activation_state',
+  'public_id',
+  'animal_id',
+  'ranch_id',
+  'batch_id',
+  'assembled_at',
+  'shipped_at',
+  'created_at',
+  'updated_at',
+].join(',')
 
 /**
  * GET /api/tags/[tag_code]
@@ -21,8 +42,12 @@ export async function GET(
     }
 
     // Use direct REST API to bypass any JS client connection pooling
+    const selectSpec = isSuperadminAuthenticated(request) ? '*' : PUBLIC_TAG_FIELDS
+
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/tags?tag_code=eq.${encodeURIComponent(tag_code)}&select=*,animals(public_id,name,species,breed),ranches(id,name)&limit=1`,
+      `${supabaseUrl}/rest/v1/tags?tag_code=eq.${encodeURIComponent(tag_code)}&select=${encodeURIComponent(
+        `${selectSpec},animals(public_id,name,species,breed),ranches(id,name)`
+      )}&limit=1`,
       {
         headers: {
           'apikey': serviceKey,

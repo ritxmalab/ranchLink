@@ -19,7 +19,7 @@ You need to add these **TWO** variables to Vercel:
 ### 2. NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 **Key:** `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
-**Value:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0b3Z6eHBtZm56aWh1cm90cW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzA3MzAsImV4cCI6MjA3NzkwNjczMH0.ENvOoFEEX80fWrWpyopVOuKpAFA6EBJYVy68KzjMSqU`  
+**Value:** `<REDACTED_SUPABASE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`  
 **Environment:** Production, Preview, Development
 
 ---

@@ -1,3 +1,21 @@
+// Next.js injects inline bootstrap scripts and Tailwind/styled-jsx inline styles,
+// so 'unsafe-inline' is required here. Connect sources cover Supabase, Pinata,
+// Alchemy/Base RPC and Stripe.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.pinata.cloud https://gateway.pinata.cloud https://*.g.alchemy.com https://mainnet.base.org https://api.stripe.com",
+  'upgrade-insecure-requests',
+].join('; ')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -19,6 +37,8 @@ const nextConfig = {
           { key: 'X-XSS-Protection', value: '1; mode=block' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
+          { key: 'Content-Security-Policy', value: contentSecurityPolicy },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],
       },
       {

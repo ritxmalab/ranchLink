@@ -152,7 +152,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authError = verifySuperadminAuth(request)
+  if (authError) return authError
+
   try {
     // Check environment variables first
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {

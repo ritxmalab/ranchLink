@@ -8,7 +8,7 @@ These are exposed to the browser and must be set in Vercel.
 | Variable Name | Value | Purpose |
 |--------------|-------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://utovzxpmfnzihurotqnv.supabase.co` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0b3Z6eHBtZm56aWh1cm90cW52Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMzA3MzAsImV4cCI6MjA3NzkwNjczMH0.ENvOoFEEX80fWrWpyopVOuKpAFA6EBJYVy68KzjMSqU` | Supabase anonymous key (public) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `<REDACTED_SUPABASE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>` | Supabase anonymous key (public) |
 | `NEXT_PUBLIC_APP_URL` | `https://ranch-link.vercel.app` | Production app URL (UPDATE THIS) |
 | `NEXT_PUBLIC_ALCHEMY_BASE_RPC` | `https://base-mainnet.g.alchemy.com/v2/trKkGtYbzcwRqlW4JtlK5` | Base mainnet RPC endpoint |
 | `NEXT_PUBLIC_ALCHEMY_BASE_SEPOLIA_RPC` | `https://base-sepolia.g.alchemy.com/v2/trKkGtYbzcwRqlW4JtlK5` | Base Sepolia testnet RPC |
@@ -21,8 +21,8 @@ These are kept private and only available to server-side code.
 
 | Variable Name | Value | Purpose |
 |--------------|-------|---------|
-| `SUPABASE_SERVICE_KEY` | `sb_secret_dVZCIHEVDYAJX_YgRlIOxg_Iwr3nYyr` | Supabase service role key (admin access) |
-| `PINATA_JWT` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI2N2E4NDYyNS1iODRiLTQwYzctOTQ2MC00OTQwNzU2NzI4NjUiLCJlbWFpbCI6ImdvbnphbG9Acml0eG1hLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiJiOTk0ZDYzZGIwY2FlMDFiMmU1NCIsInNjb3BlZEtleVNlY3JldCI6IjM4YWIxNjkyYmZiNWYzYzYwODljM2ExMGViODg1ODBiMDRkNTQ4MzkxMTIxZWE2ZWNlMTY3MGI1N2M2YTQ4MzgiLCJleHAiOjE3OTQwMjEzOTJ9.MShdtxaU3cG6aRSTQ5BIabPD7fxdNvXb8uaXwo_DV_w` | Pinata IPFS JWT token |
+| `SUPABASE_SERVICE_KEY` | `<REDACTED_SUPABASE_SERVICE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>` | Supabase service role key (admin access) |
+| `PINATA_JWT` | `<REDACTED_SUPABASE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>` | Pinata IPFS JWT token |
 | `CDP_API_KEY` | `f0625bda-ea80-45f6-8b0d-ca41e3d766bb` | Coinbase CDP API key |
 | `CDP_APP_ID` | `787f5a59-7321-4b47-9e24-f7751d5a14aa` | Coinbase CDP app ID |
 | `CDP_CLIENT_AUTH` | `xnL27LScZoQxuULH1gbvSAzu0FIj5XO8` | Coinbase CDP client auth |

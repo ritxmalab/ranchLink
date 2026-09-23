@@ -13,7 +13,7 @@ This file is the human-readable project log. Updated at the end of every Agent s
 
 ### What was built this session
 1. **Photo upload** — `/api/upload-photo` → Pinata Files API → stored as `photo_url` in `animals` table. Displayed on `/a/[public_id]` and embedded in NFT metadata.
-2. **Superadmin password gate** — `/api/superadmin/login` sets cookie `rl_superadmin`. Password: `SUPERADMIN_PASSWORD` env var (default: `ranchlink2026`).
+2. **Superadmin password gate** — `/api/superadmin/login` sets cookie `rl_superadmin`. Password: `SUPERADMIN_PASSWORD` env var (default: `<REDACTED_SUPERADMIN_PASSWORD — rotated>`).
 3. **Assemble tab** — New tab in `/superadmin`. Shows tags ready for physical assembly + shipment. `GET/POST /api/superadmin/assemble`. Tracks `assembled_at`, `shipped_at`, `assembled_by`.
 4. **Ongoing Updates** — `/api/update-animal` lets farmers add weight, notes, vet visits after initial attach. Each update re-pins IPFS + calls `setCID()` on-chain. Full event log shown on animal card.
 5. **Supabase migrations executed:**

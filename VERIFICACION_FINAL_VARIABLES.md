@@ -31,7 +31,7 @@ Haz clic en el ícono del ojo 👁️ junto a `SERVER_WALLET_PRIVATE_KEY` y veri
 - Tenga 66 caracteres en total
 - Sea la misma que está en tu `.env.local` local
 
-**Valor esperado:** `0xe1ec3ccd3262937d9530d016279f9c9915c4b89dd98ab6b2954eda6296c6fc72`
+**Valor esperado:** `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
 
 ### 3. Verificar que `SERVER_WALLET_ADDRESS` es correcta
 

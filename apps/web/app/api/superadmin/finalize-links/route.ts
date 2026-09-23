@@ -24,14 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch tags' }, { status: 500 })
     }
 
-    const result = (tags || []).map((tag) => {
-      const token = generateFinalizeToken(tag.tag_code, tag.public_id || tag.id)
-      return {
+    // Links are scoped to the animal currently on the tag, so a row without a
+    // public_id has nothing to scope to and is skipped rather than signed with
+    // the tag's own (never-changing) uuid.
+    const result = (tags || [])
+      .filter((tag) => !!tag.public_id)
+      .map((tag) => ({
         tag_code: tag.tag_code,
         public_id: tag.public_id,
-        finalize_url: `${baseUrl}/t/${tag.tag_code}?finalize=${token}`,
-      }
-    })
+        finalize_url: `${baseUrl}/t/${tag.tag_code}?finalize=${generateFinalizeToken(tag.tag_code, tag.public_id)}`,
+      }))
 
     return NextResponse.json({ tags: result })
   } catch (error: any) {

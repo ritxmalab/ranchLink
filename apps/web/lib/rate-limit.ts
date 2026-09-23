@@ -15,13 +15,14 @@ export function rateLimit(
   maxRequests: number = 10,
   windowMs: number = 60000 // 1 minuto
 ): boolean {
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
+  const ip = request.ip || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  const key = `${ip}|${request.nextUrl.pathname}`
   const now = Date.now()
-  
-  const record = rateLimitMap.get(ip)
-  
+
+  const record = rateLimitMap.get(key)
+
   if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs })
+    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
     return true
   }
   
@@ -39,9 +40,9 @@ export function rateLimit(
  */
 export function cleanupRateLimitMap() {
   const now = Date.now()
-  for (const [ip, record] of rateLimitMap.entries()) {
+  for (const [key, record] of rateLimitMap.entries()) {
     if (now > record.resetTime) {
-      rateLimitMap.delete(ip)
+      rateLimitMap.delete(key)
     }
   }
 }
