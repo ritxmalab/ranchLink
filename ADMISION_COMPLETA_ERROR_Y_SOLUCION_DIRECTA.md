@@ -93,7 +93,7 @@
 
 ```
 Address:     0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
-Private Key: 0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
+Private Key: <REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
 ```
 
 ### 2. Cambios Mínimos Necesarios
@@ -103,7 +103,7 @@ Private Key: 0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
 #### A) `.env.local` (1 archivo)
 ```bash
 SERVER_WALLET_ADDRESS=0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
-SERVER_WALLET_PRIVATE_KEY=0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
+SERVER_WALLET_PRIVATE_KEY=<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
 ```
 
 #### B) Vercel (1 lugar)

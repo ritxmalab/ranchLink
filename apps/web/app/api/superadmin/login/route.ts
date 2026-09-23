@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { makeSuperadminSessionToken } from '@/lib/superadmin-auth'
 import { rateLimit } from '@/lib/rate-limit'
+import { timingSafeEqualString } from '@/lib/ranch-auth'
 
 export async function POST(request: NextRequest) {
   if (!rateLimit(request, 8, 60000)) {
@@ -15,7 +16,9 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedUsername = typeof username === 'string' ? username.trim().toLowerCase() : ''
-  if (password !== correct || normalizedUsername !== expectedUsername) {
+  const passwordOk = typeof password === 'string' && timingSafeEqualString(password, correct)
+  const usernameOk = timingSafeEqualString(normalizedUsername, expectedUsername)
+  if (!passwordOk || !usernameOk) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 

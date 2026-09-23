@@ -34,7 +34,7 @@ insufficient funds for gas * price + value: balance 0, tx cost 244304314556
 ```bash
 cd packages/contracts
 
-export PRIVATE_KEY=0xe1ec3ccd3262937d9530d016279f9c9915c4b89dd98ab6b2954eda6296c6fc72
+export PRIVATE_KEY=<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
 export RANCHLINKTAG_ADDRESS=0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242
 export SERVER_WALLET_ADDRESS=0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
 export ALCHEMY_BASE_RPC=<tu_rpc_url>

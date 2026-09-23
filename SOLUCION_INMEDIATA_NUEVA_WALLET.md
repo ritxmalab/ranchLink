@@ -15,7 +15,7 @@ Otorgar `MINTER_ROLE` a la nueva wallet EOA normal y dejar de usar la wallet com
 ```bash
 # NUEVA wallet EOA (reemplaza la vieja)
 SERVER_WALLET_ADDRESS=0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
-SERVER_WALLET_PRIVATE_KEY=0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
+SERVER_WALLET_PRIVATE_KEY=<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
 
 # Contrato (mantener)
 RANCHLINKTAG_ADDRESS=0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242
@@ -28,7 +28,7 @@ NEXT_PUBLIC_CONTRACT_TAG=0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242
 
 **Actualiza:**
 - `SERVER_WALLET_ADDRESS` = `0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4`
-- `SERVER_WALLET_PRIVATE_KEY` = `0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7`
+- `SERVER_WALLET_PRIVATE_KEY` = `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
 
 ### 3. Fondea Nueva Wallet
 
@@ -62,7 +62,7 @@ npx hardhat run scripts/grant-minter-upgradeable.ts --network base
 # Si la nueva wallet tiene ADMIN_ROLE (poco probable)
 cd packages/contracts
 
-export PRIVATE_KEY=0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
+export PRIVATE_KEY=<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
 export RANCHLINKTAG_ADDRESS=0xCE165B70379Ca6211f9dCf6ffe8c3AC1eedB6242
 export SERVER_WALLET_ADDRESS=0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
 

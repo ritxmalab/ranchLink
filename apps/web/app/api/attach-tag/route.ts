@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/rate-limit'
+import { validateSession } from '@/lib/ranch-auth'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,11 @@ export async function POST(request: NextRequest) {
 
     const { tagCode, animalData } = validated
     const supabase = getSupabaseServerClient()
+
+    // Bridge to account ownership: when the farmer attaches while signed in,
+    // the tag and animal are bound to their ranch and custodial wallet instead
+    // of relying on the anonymous claim-token cookie alone.
+    const session = await validateSession(request)
 
     // 1. Load tag — must exist and be on-chain
     const { data: tag, error: tagError } = await supabase
@@ -180,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
 
       publicId = `AUS${String(nextNumber).padStart(4, '0')}`
-      const ranchId = tag.ranch_id || null
+      const ranchId = session?.ranchId || tag.ranch_id || null
 
       const { data: newAnimal, error: animalError } = await supabase
         .from('animals')
@@ -207,31 +213,45 @@ export async function POST(request: NextRequest) {
     const { randomUUID } = await import('crypto')
     const claimToken = randomUUID()
 
-    // Try with claim_token first; if the column doesn't exist yet, retry without it
-    let { error: updateError } = await supabase
+    // Compare-and-set on status so two concurrent scans of the same QR cannot
+    // both attach the tag (last writer would otherwise silently win).
+    let { data: claimedRows, error: updateError } = await supabase
       .from('tags')
       .update({
         animal_id: animalId,
         public_id: publicId,
-        ranch_id: tag.ranch_id || null,
+        ranch_id: session?.ranchId || tag.ranch_id || null,
         status: 'attached',
         claim_token: claimToken,
+        ...(session?.userId ? { owner_user_id: session.userId } : {}),
       })
       .eq('id', tag.id)
+      .in('status', validStatuses)
+      .select('id')
 
     if (updateError && (updateError.code === '42703' || updateError.code === 'PGRST204')) {
       // claim_token column not yet migrated — attach without it (ownership won't work until migration is run)
       console.warn('[ATTACH-TAG] claim_token column missing, attaching without ownership token. Run: ALTER TABLE public.tags ADD COLUMN IF NOT EXISTS claim_token UUID;')
-      const { error: retryError } = await supabase
+      const { data: retryRows, error: retryError } = await supabase
         .from('tags')
         .update({
           animal_id: animalId,
           public_id: publicId,
-          ranch_id: tag.ranch_id || null,
+          ranch_id: session?.ranchId || tag.ranch_id || null,
           status: 'attached',
         })
         .eq('id', tag.id)
+        .in('status', validStatuses)
+        .select('id')
       updateError = retryError ?? null
+      claimedRows = retryRows ?? null
+    }
+
+    if (!updateError && (!claimedRows || claimedRows.length === 0)) {
+      return NextResponse.json(
+        { error: 'Tag was just attached by another request', tag_code: tag.tag_code },
+        { status: 409 }
+      )
     }
 
     if (updateError) {
@@ -242,7 +262,7 @@ export async function POST(request: NextRequest) {
     // 5b. Write tag_id back to animal (required so dashboard and animal page show the tag)
     const { error: tagLinkError } = await supabase
       .from('animals')
-      .update({ tag_id: tag.id })
+      .update({ tag_id: tag.id, ...(session?.ranchId ? { ranch_id: session.ranchId } : {}) })
       .eq('id', animalId)
     if (tagLinkError) {
       console.error('[ATTACH-TAG] Failed to write tag_id to animal:', tagLinkError.message)

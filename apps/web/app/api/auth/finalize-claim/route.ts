@@ -52,10 +52,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This tag has already been claimed by another user' }, { status: 409 })
     }
 
-    const { error: updateError } = await supabase
+    // Claim atomically: only an unowned tag (or one already owned by this user)
+    // can be linked, so two concurrent finalizations cannot both win.
+    const { data: claimed, error: updateError } = await supabase
       .from('tags')
       .update({ owner_user_id: userId, ranch_id: ranchId })
       .eq('id', tag.id)
+      .or(`owner_user_id.is.null,owner_user_id.eq.${userId}`)
+      .select('id')
+
+    if (!updateError && (!claimed || claimed.length === 0)) {
+      return NextResponse.json({ error: 'This tag has already been claimed by another user' }, { status: 409 })
+    }
 
     if (updateError) {
       console.error('[AUTH] finalize-claim tag update error:', updateError)

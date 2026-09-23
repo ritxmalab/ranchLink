@@ -111,7 +111,7 @@
 
 1. **Usar Nueva Wallet EOA Normal:**
    - Address: `0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4`
-   - Private Key: `0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7`
+   - Private Key: `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
    - NO es smart wallet, NO drena fondos
 
 2. **Otorgar MINTER_ROLE a Nueva Wallet:**

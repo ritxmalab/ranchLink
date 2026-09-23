@@ -7,8 +7,10 @@ const SESSION_TTL_SECONDS = 60 * 60 * 12 // 12h
 function getSessionSecret(): string {
   const envSecret = process.env.SUPERADMIN_SESSION_SECRET
   if (envSecret && envSecret.length >= 32) return envSecret
-  // Fallback to configured admin password only when explicit session secret is absent.
-  // Never hardcode defaults in source.
+  // In production the signing key must be an explicit high-entropy secret:
+  // deriving it from the admin password lets anyone who learns the password
+  // forge sessions and survives password rotation.
+  if (process.env.NODE_ENV === 'production') return ''
   return process.env.SUPERADMIN_PASSWORD || ''
 }
 

@@ -190,7 +190,13 @@ export default function AnimalPublicIdPage({ params }: { params: { public_id: st
         const photoForm = new FormData()
         photoForm.append('file', updatePhotoFile)
         photoForm.append('public_id', public_id)
-        const photoRes = await fetch('/api/upload-photo', { method: 'POST', body: photoForm })
+        const uploadToken = getOwnerCookie(public_id)
+        if (uploadToken) photoForm.append('claim_token', uploadToken)
+        const photoRes = await fetch('/api/upload-photo', {
+          method: 'POST',
+          credentials: 'include',
+          body: photoForm,
+        })
         const photoData = await photoRes.json()
         if (photoRes.ok && photoData.photo_url) photoUrl = photoData.photo_url
       }

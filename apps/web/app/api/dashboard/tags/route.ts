@@ -1,30 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
+import { validateSession } from '@/lib/ranch-auth'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/dashboard/tags
- * Get tags for the current logged-in ranch user (v1.0)
- * 
- * TODO: Filter by authenticated user's ranch_id
- * For now, returns all tags (will be filtered by ranch_id in production)
+ *
+ * Scope depends on the caller:
+ *   admin  — every tag, for inventory operations
+ *   ranch  — only the signed-in ranch's tags
+ *   public — attached tags only (demo-safe, no inventory leakage)
  */
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseServerClient()
     const isAdmin = isSuperadminAuthenticated(request)
-
-    // TODO: Get current user's ranch_id from Supabase Auth
-    // const { data: { user } } = await supabase.auth.getUser()
-    // const userRanchId = user?.user_metadata?.ranch_id
-    // if (!userRanchId) {
-    //   return NextResponse.json({ tags: [] })
-    // }
-
-    // Public mode: show only attached tags (demo-safe, no inventory leakage).
-    // Admin mode: show all tags for operational inventory management.
+    const session = isAdmin ? null : await validateSession(request)
     const baseQuery = supabase
       .from('tags')
       .select(`
@@ -43,7 +36,11 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false })
 
-    const query = isAdmin ? baseQuery : baseQuery.eq('status', 'attached')
+    const query = isAdmin
+      ? baseQuery
+      : session
+      ? baseQuery.eq('ranch_id', session.ranchId)
+      : baseQuery.eq('status', 'attached')
     const { data: tags, error } = await query
 
     if (error) {
@@ -54,7 +51,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const res = NextResponse.json({ tags: tags || [], scope: isAdmin ? 'admin' : 'public' })
+    const res = NextResponse.json({ tags: tags || [], scope: isAdmin ? 'admin' : session ? 'ranch' : 'public' })
     res.headers.set('Cache-Control', 'no-store, must-revalidate')
     res.headers.set('Pragma', 'no-cache')
     return res

@@ -7,7 +7,7 @@
 **Sí, las wallets nuevas ya fueron creadas:**
 
 - **Address:** `0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4`
-- **Private Key:** `0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7`
+- **Private Key:** `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
 
 **Referencias en documentos:**
 - `SOLUCION_INMEDIATA_NUEVA_WALLET.md`
@@ -22,7 +22,7 @@
 1. Ve a: Vercel Dashboard → Settings → Environment Variables
 2. Actualiza estas variables:
    - `SERVER_WALLET_ADDRESS` = `0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4`
-   - `SERVER_WALLET_PRIVATE_KEY` = `0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7`
+   - `SERVER_WALLET_PRIVATE_KEY` = `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
 3. **Redeploy** después de actualizar las variables
 
 **Verificación:**
@@ -130,7 +130,7 @@ Error: Server wallet does NOT have MINTER_ROLE on contract
 2. Agrega/Actualiza:
    ```
    SERVER_WALLET_ADDRESS=0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4
-   SERVER_WALLET_PRIVATE_KEY=0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7
+   SERVER_WALLET_PRIVATE_KEY=<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
    RANCHLINKTAG_ADDRESS=0x... (dirección del contrato deployado)
    NEXT_PUBLIC_CONTRACT_TAG=0x... (misma dirección)
    ```
@@ -189,7 +189,7 @@ GET https://ranch-link.vercel.app/api/diagnose-mint
 1. **¿Ya creaste las wallets nuevas?**
    - ✅ SÍ, fueron creadas anteriormente
    - Address: `0xD305B89BbD5Bc65609dab650d53cCe94Fa44BDe4`
-   - Private Key: `0xabf8f0095eedcbde8117311cf7f541414a13bb96ff0f5784dcfa9c2d6fbc51c7`
+   - Private Key: `<REDACTED_PRIVATE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>`
 
 2. **¿Aún es necesario actualizarlas en Vercel?**
    - ✅ SÍ, **aún NO están en Vercel**

@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/rate-limit'
+import { z } from 'zod'
+
+export const dynamic = 'force-dynamic'
+
+const claimKitSchema = z.object({
+  kitCode: z.string().min(1).max(64),
+  ranch: z.object({
+    name: z.string().min(1).max(200),
+    contact_email: z.string().email().max(255),
+    phone: z.string().max(30).optional(),
+  }),
+})
 
 /**
  * POST /api/claim-kit
@@ -16,15 +29,21 @@ import { getSupabaseServerClient } from '@/lib/supabase/server'
  * }
  */
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { kitCode, ranch } = body
+  // Kit codes are bearer secrets — throttle guessing.
+  if (!rateLimit(request, 5, 60000)) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+  }
 
-    if (!kitCode || !ranch || !ranch.name || !ranch.contact_email) {
-      return NextResponse.json(
-        { error: 'Missing required fields: kitCode, ranch.name, ranch.contact_email' },
-        { status: 400 }
-      )
+  try {
+    let kitCode: string
+    let ranch: { name: string; contact_email: string; phone?: string }
+    try {
+      ({ kitCode, ranch } = claimKitSchema.parse(await request.json()))
+    } catch (e) {
+      if (e instanceof z.ZodError) {
+        return NextResponse.json({ error: 'Invalid request body', details: e.errors }, { status: 400 })
+      }
+      throw e
     }
 
     const supabase = getSupabaseServerClient()

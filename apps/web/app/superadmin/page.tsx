@@ -976,7 +976,14 @@ export default function SuperAdminPage() {
               <h1 className="text-4xl font-bold mb-2">RanchLink Factory</h1>
               <p className="text-[var(--c4)]">Generate blockchain-linked tags for production</p>
             </div>
-            <div className="text-right">
+            <div className="text-right flex items-center gap-3">
+              <a
+                href="/api/superadmin/export"
+                className="btn-secondary whitespace-nowrap"
+                title="Download a JSON backup of tags, animals, events, ranches, batches and orders"
+              >
+                ⬇️ Backup data
+              </a>
               <div className="bg-[var(--bg-card)] border-2 border-[var(--c2)]/50 px-4 py-2 rounded-lg shadow-lg">
                 <div className="text-sm font-bold text-[var(--c2)] font-mono">
                   {getBuildBadgeText()}

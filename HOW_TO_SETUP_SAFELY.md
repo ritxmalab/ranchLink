@@ -31,7 +31,7 @@ Adding a secret key to a file on YOUR computer.
 
 5. Add the key after the `=`:
    ```
-   SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   SUPABASE_SERVICE_KEY=<REDACTED_SUPABASE_KEY — rotated, see SECURITY_LAUNCH_AUDIT.md>
    ```
 
 6. Save the file

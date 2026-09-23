@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server'
 import { isSuperadminAuthenticated } from '@/lib/superadmin-auth'
+import { validateSession } from '@/lib/ranch-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseServerClient()
     const isAdmin = isSuperadminAuthenticated(request)
+    const session = isAdmin ? null : await validateSession(request)
 
     const adminSelectSpec = `
       *,
@@ -32,6 +34,42 @@ export async function GET(request: NextRequest) {
         contact_email
       )
     `
+
+    // A signed-in farmer sees their own herd in full, scoped to their ranch.
+    if (session) {
+      const ranchSelectSpec = `
+        *,
+        tags (
+          tag_code,
+          token_id,
+          mint_tx_hash,
+          chain,
+          contract_address,
+          status,
+          activation_state
+        )
+      `
+      const { data: ranchAnimals, error: ranchError } = await supabase
+        .from('animals')
+        .select(ranchSelectSpec)
+        .eq('ranch_id', session.ranchId)
+        .order('created_at', { ascending: false })
+
+      if (ranchError) {
+        console.error('Error fetching ranch dashboard animals:', ranchError)
+        return NextResponse.json({ error: ranchError.message }, { status: 500 })
+      }
+
+      const res = NextResponse.json({
+        animals: ranchAnimals || [],
+        scope: 'ranch',
+        ranch_id: session.ranchId,
+        wallet_address: session.walletAddress,
+      })
+      res.headers.set('Cache-Control', 'no-store, must-revalidate')
+      res.headers.set('Pragma', 'no-cache')
+      return res
+    }
 
     // Public mode keeps showcase visibility while preventing sensitive exposure.
     if (!isAdmin) {
