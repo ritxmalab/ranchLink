@@ -35,16 +35,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired link. Please request a new one.' }, { status: 400 })
     }
 
-    const valid = await verifyCode(email, code, 'claim')
-    if (!valid) {
-      await incrementAttempts(email, 'claim')
-      return NextResponse.json({ error: 'Invalid or expired code. Please try again.' }, { status: 400 })
-    }
-
-    const { userId, ranchId, walletAddress } = await findOrCreateRanchUser(email, phone || null, name || null)
-
     const supabase = getSupabaseServerClient()
 
+    // Validate the link against the tag before consuming the one-time code or
+    // provisioning an account, so a stale link cannot burn either.
     const { data: tag, error: tagError } = await supabase
       .from('tags')
       .select('id, owner_user_id, public_id, animal_id')
@@ -60,6 +54,14 @@ export async function POST(request: NextRequest) {
     if (tag.public_id !== tokenData.publicId) {
       return NextResponse.json({ error: 'Invalid or expired link. Please request a new one.' }, { status: 400 })
     }
+
+    const valid = await verifyCode(email, code, 'claim')
+    if (!valid) {
+      await incrementAttempts(email, 'claim')
+      return NextResponse.json({ error: 'Invalid or expired code. Please try again.' }, { status: 400 })
+    }
+
+    const { userId, ranchId, walletAddress } = await findOrCreateRanchUser(email, phone || null, name || null)
 
     if (tag.owner_user_id && tag.owner_user_id !== userId) {
       return NextResponse.json({ error: 'This tag has already been claimed by another user' }, { status: 409 })
@@ -89,7 +91,11 @@ export async function POST(request: NextRequest) {
         .update({ ranch_id: ranchId })
         .eq('id', tag.animal_id)
       if (animalError) {
+        // The tag claim is idempotent for this user, so surfacing the failure
+        // lets a retry finish the job rather than leaving the animal outside
+        // the ranch the tag now belongs to.
         console.error('[AUTH] finalize-claim animal update error:', animalError)
+        return NextResponse.json({ error: 'Failed to link the animal to your ranch. Please try again.' }, { status: 500 })
       }
     }
 
